@@ -7,7 +7,7 @@ public class App {
     public static void main(String[] args) {
 
         Scanner scanner = new Scanner(System.in);
-        System.out.println("--- Suite de Herramientas para Novelas v7.0 ---");
+        System.out.println("--- Suite de Herramientas para Novelas v1.0 ---");
 
         while (true) {
             System.out.println("\n¿Qué suite de herramientas quieres usar?");
