@@ -14,7 +14,8 @@ Herramienta automatizada en Java para descargar novelas completas desde sitios w
 
 ## 🛠️ Instalación y Uso
 1. Clona el repositorio:
-   ```bash git clone [https://github.com/TecnoLector/Scraper-Novelas.git](https://github.com/TU_USUARIO/Scraper-Novelas.git)
+   ```bash
+   git clone [https://github.com/TecnoLector/Scraper-Novelas.git](https://github.com/TU_USUARIO/Scraper-Novelas.git)
 2. Abre el proyecto en tu IDE favorito (IntelliJ, Eclipse, VS Code).
 3. Ejecuta la clase App.java.
 4. Sigue las instrucciones en consola.
