@@ -1,0 +1,93 @@
+/* ======================================================
+   1. DECLARACIÓN DE LAS FUENTES
+====================================================== */
+
+@font-face {
+  font-family: "FuenteContenido";
+  font-weight: normal;
+  font-style: normal;
+  src: url("../Fonts/Merriweather-Regular.ttf");
+}
+
+@font-face {
+  font-family: "FuenteContenido";
+  font-weight: normal;
+  font-style: italic;
+  src: url("../Fonts/Merriweather-Italic.ttf");
+}
+
+@font-face {
+  font-family: "FuenteTitulos";
+  font-weight: bold;
+  font-style: normal;
+  src: url("../Fonts/Montserrat-Bold.ttf");
+}
+@font-face {
+  font-family: "FuenteDecorativa"; /* El nombre que le quieras dar */
+  src: url("../Fonts/CinzelDecorative-Regular.ttf"); /* <-- CAMBIA ESTO por el nombre de tu archivo de fuente */
+}
+
+
+/* ======================================================
+   2. APLICACIÓN DE LAS FUENTES
+====================================================== */
+
+body {
+    font-family: "FuenteContenido", serif; /* Usa Merriweather para todo el cuerpo */
+    font-size: 10pt;
+    line-height: 1.5;
+    margin-left: 5%;
+    margin-right: 5%;
+}
+
+h1 {
+    font-family: "FuenteTitulos", sans-serif; /* Usa Montserrat para los títulos */
+    font-size: 2em;
+    font-weight: bold; /* Asegura que se use la versión Bold */
+    text-align: center;
+    margin-top: 2em;
+    margin-bottom: 1em;
+    page-break-before: always;
+    text-indent: 0;
+}
+
+p {
+    /* --- Tipografía y Tamaño --- */
+    font-size: 1em;      /* Tamaño de la letra. 1.15em es un 15% más grande que el por defecto y muy legible. */
+    line-height: 1.6;       
+    text-align: justify;    /* Justifica el texto para un acabado profesional, alineado a ambos márgenes. */
+    text-indent: 2.3em;     /* Sangría en la primera línea de cada párrafo. 1.5em es un estándar editorial. */
+    hyphens: auto;          
+    widows: 4;              
+    orphans: 2;            
+    margin-top: 1;          /* Sin espacio extra arriba del párrafo. */
+    margin-bottom: 0;       
+    padding: 0;             /* Asegura que no haya relleno interno que pueda causar espaciados no deseados. */
+}
+
+p.sin-sangria {
+    text-indent: 0;
+}
+
+p.con-capital::first-letter {
+   font-family: "FuenteDecorativa", CinzelDecorative-Regular;
+   font-size: 4em;
+   float: left;
+   line-height: 0.8;
+   color: black;
+   margin-top: 0.1em;
+   margin-right: 0.15em;
+   margin-bottom: -0.1em;
+}
+
+@media (prefers-color-scheme: dark) {
+
+    h1 {
+        color: white;
+    }
+
+    p.sin-sangria::first-letter {
+        color: white;
+    }
+
+}
