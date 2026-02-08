@@ -8,8 +8,8 @@ public class SitioSkyNovels extends SitioWebConfig {
     }
 
     @Override
-    public boolean esSoportado(String url) {
-        return true; 
+    public boolean soportaUrl(String url) {
+        return true;
     }
 
     @Override

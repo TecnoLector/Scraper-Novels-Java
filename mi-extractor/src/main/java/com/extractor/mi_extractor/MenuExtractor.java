@@ -251,7 +251,7 @@ public class MenuExtractor {
             return;
         }
 
-        System.out.print("\n --------------------");
+        System.out.print("\n --------------------\n");
         System.out.print("Desde Capitulo #: ");
         int inicio = scanner.nextInt();
         System.out.print("Hasta Capitulo #: ");
@@ -269,37 +269,38 @@ public class MenuExtractor {
     }
 
     private static void descargarListaEspecifica(Scanner scanner, String rutaNovelaStr) {
-    System.out.println("Introduce la URL de la PORTADA de la novela:");
-    String urlPortada = scanner.nextLine();
+        System.out.println("Introduce la URL de la PORTADA de la novela:");
+        String urlPortada = scanner.nextLine();
 
-    System.out.println("Introduce los números de capítulo separados por comas (ej: 10, 25, 100):");
-    String listaDeNumerosStr = scanner.nextLine();
-    Map<Integer, String> todosLosCapitulos = obtenerTodosLosCapitulos(urlPortada);
+        System.out.println("Introduce los números de capítulo separados por comas (ej: 10, 25, 100):");
+        String listaDeNumerosStr = scanner.nextLine();
+        Map<Integer, String> todosLosCapitulos = obtenerTodosLosCapitulos(urlPortada);
 
-    if (todosLosCapitulos.isEmpty()) {
-        System.out.println("Error: No se pudieron obtener capítulos de esa URL.");
-        return;
-    }
-    Map<Integer, String> capitulosParaDescargar = new HashMap<>();
-    
-    try {
-        String[] numeros = listaDeNumerosStr.split(",");
-        for (String numeroStr : numeros) {
-            int numBuscado = Integer.parseInt(numeroStr.trim());
-            
-            if (todosLosCapitulos.containsKey(numBuscado)) {
-                capitulosParaDescargar.put(numBuscado, todosLosCapitulos.get(numBuscado));
-            } else {
-                System.err.println("Advertencia: El capítulo " + numBuscado + " no se encontró en el índice de la web.");
-            }
+        if (todosLosCapitulos.isEmpty()) {
+            System.out.println("Error: No se pudieron obtener capítulos de esa URL.");
+            return;
         }
-    } catch (NumberFormatException e) {
-        System.err.println("Error: Ingresaste un valor que no es un número.");
-        return;
-    }
+        Map<Integer, String> capitulosParaDescargar = new HashMap<>();
 
-    ejecutarDescargaParalela(capitulosParaDescargar, rutaNovelaStr, scanner);
-}
+        try {
+            String[] numeros = listaDeNumerosStr.split(",");
+            for (String numeroStr : numeros) {
+                int numBuscado = Integer.parseInt(numeroStr.trim());
+
+                if (todosLosCapitulos.containsKey(numBuscado)) {
+                    capitulosParaDescargar.put(numBuscado, todosLosCapitulos.get(numBuscado));
+                } else {
+                    System.err.println(
+                            "Advertencia: El capítulo " + numBuscado + " no se encontró en el índice de la web.");
+                }
+            }
+        } catch (NumberFormatException e) {
+            System.err.println("Error: Ingresaste un valor que no es un número.");
+            return;
+        }
+
+        ejecutarDescargaParalela(capitulosParaDescargar, rutaNovelaStr, scanner);
+    }
 
     private static Capitulo procesarUnCapitulo(Scraper scraper, String url, String rutaDeGuardado, int numeroCapitulo)
             throws Exception {
@@ -338,14 +339,15 @@ public class MenuExtractor {
         return 0;
     }
 
-    private static void ejecutarDescargaParalela(Map<Integer, String> capitulosParaDescargar, String rutaDeGuardado, Scanner scanner) {
+    private static void ejecutarDescargaParalela(Map<Integer, String> capitulosParaDescargar, String rutaDeGuardado,
+            Scanner scanner) {
         if (capitulosParaDescargar.isEmpty()) {
             System.out.println("No hay capítulos para descargar.");
             return;
         }
 
         int totalCapitulos = capitulosParaDescargar.size();
-        int numeroHilos = 5; 
+        int numeroHilos = 5;
         double constanteVelocidad = calcularConstanteRealista(numeroHilos);
         double tiempoTotalSegundos = (totalCapitulos * constanteVelocidad) / numeroHilos;
         long minutosEst = (long) (tiempoTotalSegundos / 60);
@@ -359,7 +361,7 @@ public class MenuExtractor {
         System.out.println(" Factor de carga: " + constanteVelocidad + "s por hilo");
         System.out.println(" TIEMPO ESTIMADO: ~" + minutosEst + " min " + segundosEst + " s.");
         System.out.println("------------------------------------------------");
-        
+
         System.out.print("¿Deseas continuar? (Y/N): ");
         String confirmacion = scanner.nextLine().trim().toUpperCase();
 
@@ -367,10 +369,13 @@ public class MenuExtractor {
             System.out.println("Operación cancelada por el usuario.");
             return;
         }
+
+        List<Integer> capitulosFallidos = java.util.Collections.synchronizedList(new ArrayList<>());
+
         ExecutorService executor = Executors.newFixedThreadPool(numeroHilos);
         AtomicInteger contadorExitos = new AtomicInteger(0);
 
-        System.out.println("\n>>> INICIANDO DESCARGA CON " + numeroHilos + " NAVEGADORES...");
+        System.out.println("\n>>> INICIANDO DESCARGA CON " + numeroHilos + " HILOS...");
 
         List<Map.Entry<Integer, String>> listaTotal = new ArrayList<>(capitulosParaDescargar.entrySet());
 
@@ -378,21 +383,28 @@ public class MenuExtractor {
 
         for (int i = 0; i < numeroHilos; i++) {
             final int inicio = i * tamanoLote;
-            if (inicio >= totalCapitulos) break;
-            
+            if (inicio >= totalCapitulos)
+                break;
+
             final int fin = Math.min(inicio + tamanoLote, totalCapitulos);
             List<Map.Entry<Integer, String>> subLista = listaTotal.subList(inicio, fin);
             executor.submit(() -> {
-                Scraper scraperHilo = new Scraper(); 
+                Scraper scraperHilo = new Scraper();
                 try {
                     for (Map.Entry<Integer, String> entrada : subLista) {
                         int numCap = entrada.getKey();
                         String urlCap = entrada.getValue();
+                        boolean exito = false;
                         try {
                             System.out.println("[Hilo " + Thread.currentThread().getId() + "] Bajando Cap #" + numCap);
-                            
+
                             scraperHilo.navegarA(urlCap);
                             String html = scraperHilo.obtenerHtmlDePagina();
+
+                            if (html == null) {
+                                throw new RuntimeException("El HTML vino vacío (posible bloqueo o timeout).");
+                            }
+
                             SitioWebConfig configDetectada = scraperHilo.getConfig();
                             ExtractorContenido extractor = new ExtractorContenido();
                             Capitulo capitulo = extractor.extraer(html, configDetectada);
@@ -401,13 +413,18 @@ public class MenuExtractor {
                                 EscritorArchivo escritor = new EscritorArchivo();
                                 escritor.guardarCapitulo(capitulo, rutaDeGuardado, numCap);
                                 contadorExitos.incrementAndGet();
+                                exito = true;
                             }
                         } catch (Exception e) {
                             System.err.println("X Error en Cap #" + numCap + ": " + e.getMessage());
                         }
+
+                        if (!exito) {
+                            capitulosFallidos.add(numCap);
+                        }
                     }
                 } finally {
-                    scraperHilo.cerrar(); 
+                    scraperHilo.cerrar();
                 }
             });
         }
@@ -418,36 +435,96 @@ public class MenuExtractor {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-        
+
         System.out.println("\n--- Proceso finalizado ---");
         System.out.println("Descargados correctamente: " + contadorExitos.get() + "/" + totalCapitulos);
-        System.out.println("Cantidad de hilos: " +numeroHilos);
+        System.out.println("Cantidad de hilos: " + numeroHilos);
+
+        mostrarReporteErrores(capitulosFallidos);
     }
 
     private static double calcularConstanteRealista(int hilos) {
-        if (hilos <= 2) return 2.0;
-        if (hilos <= 5) return 2.2; // Óptimo (Tu prueba de 500 caps)
-        if (hilos == 6) return 2.8;
-        if (hilos == 7) return 3.5;
-        if (hilos == 8) return 4.2;
-        if (hilos == 9) return 4.9;
+        if (hilos <= 2)
+            return 2.0;
+        if (hilos <= 5)
+            return 2.2;
+        if (hilos == 6)
+            return 2.8;
+        if (hilos == 7)
+            return 3.5;
+        if (hilos == 8)
+            return 4.2;
+        if (hilos == 9)
+            return 4.9;
         return 5.5;
     }
 
     private static Map<Integer, String> obtenerTodosLosCapitulos(String urlPortada) {
-        System.out.println("Obteniendo lista de capítulos desde: " + urlPortada);
+        System.out.println("Obteniendo lista de capítulos...");
+        Map<Integer, String> mapaTotal = new HashMap<>();
 
         Scraper scraper = new Scraper();
-        scraper.navegarA(urlPortada);
-        String htmlIndice = scraper.obtenerHtmlDeIndice();
-        
-        scraper.cerrar();
+        IndiceExtractor extractor = new IndiceExtractor();
 
-        if (htmlIndice != null && !htmlIndice.isEmpty()) {
-            IndiceExtractor extractor = new IndiceExtractor();
-            return extractor.extraerEnlaces(htmlIndice, urlPortada);
-        } else {
-            return new HashMap<>(); // Retornamos mapa vacío si falló
+        String urlActual = urlPortada;
+        int pagina = 1;
+
+        while (urlActual != null) {
+            System.out.println(" Analizando índice - Página " + pagina + "...");
+            scraper.navegarA(urlActual);
+
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException e) {
+            }
+            String htmlIndice = scraper.obtenerHtmlDeIndice();
+            if (htmlIndice == null)
+                break;
+
+            Map<Integer, String> capitulosPagina = extractor.extraerEnlaces(htmlIndice, urlActual);
+
+            if (capitulosPagina.isEmpty() && pagina == 1) {
+                System.err.println("No se encontraron capítulos en la primera página.");
+                break;
+            } else if (capitulosPagina.isEmpty()) {
+                System.out.println("Página vacía, terminando escaneo.");
+                break;
+            }
+
+            mapaTotal.putAll(capitulosPagina);
+            System.out.println(" -> Encontrados " + capitulosPagina.size() + " caps en esta página. (Total acumulado: "
+                    + mapaTotal.size() + ")");
+            String urlSiguiente = extractor.obtenerSiguientePagina(htmlIndice, urlActual);
+
+            if (urlSiguiente != null && !urlSiguiente.equals(urlActual)) {
+                System.out.println("Detectada siguiente página del índice: " + urlSiguiente);
+                urlActual = urlSiguiente;
+                pagina++;
+            } else {
+                System.out.println("Fin del índice (no hay más páginas).");
+                urlActual = null;
+            }
         }
+
+        scraper.cerrar();
+        return mapaTotal;
+    }
+
+    private static void mostrarReporteErrores(List<Integer> capitulosFallidos) {
+        System.out.println("\n------------------------------------------------");
+        System.out.println("           RESUMEN DE LA OPERACIÓN              ");
+        System.out.println("------------------------------------------------");
+
+        if (capitulosFallidos.isEmpty()) {
+            System.out.println("¡ÉXITO TOTAL! Todos los capítulos se descargaron correctamente.");
+        } else {
+            java.util.Collections.sort(capitulosFallidos);
+
+            System.err.println("ATENCIÓN: Hubo errores en " + capitulosFallidos.size() + " capítulos.");
+            System.err.println("Lista de capítulos NO descargados:");
+            System.err.println(capitulosFallidos.toString());
+            System.out.println("Sugerencia: Copia esta lista y usa la opción de descargar por rango o individual.");
+        }
+        System.out.println("------------------------------------------------\n");
     }
 }

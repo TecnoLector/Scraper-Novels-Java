@@ -8,8 +8,8 @@ public class SitioNovelasLigera extends SitioWebConfig {
     }
 
     @Override
-    public boolean esSoportado(String url) {
-        return url.contains("novelasligera");
+    public boolean soportaUrl(String url) {
+        return url.toLowerCase().contains("novelasligera");
     }
 
     @Override

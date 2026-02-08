@@ -5,21 +5,21 @@ import java.util.List;
 
 public class GestorSitios {
     
-    private static List<SitioWebConfig> sitiosRegistrados = new ArrayList<>();
+    private static final List<SitioWebConfig> SITIOS_REGISTRADOS = new ArrayList<>();
+
     static {
-        sitiosRegistrados.add(new SitioNovelasLigera());
-        sitiosRegistrados.add(new SitioSkyNovels()); 
-        
-        // sitiosRegistrados.add(0, new SitioTuManga());
+        SITIOS_REGISTRADOS.add(new SitioNovelasLigera());
+        SITIOS_REGISTRADOS.add(new SitioTuNovelaLigera());
+        SITIOS_REGISTRADOS.add(new SitioSkyNovels());
     }
 
     public static SitioWebConfig obtenerConfig(String url) {
-        for (SitioWebConfig sitio : sitiosRegistrados) {
-            if (sitio.esSoportado(url)) {
-                System.out.println("Web detectada: " + sitio.getNombreSitio());
+        for (SitioWebConfig sitio : SITIOS_REGISTRADOS) {
+            if (sitio.soportaUrl(url)) {
                 return sitio;
             }
         }
-        return null;
+        System.out.println("⚠️ Web no reconocida. Usando configuración por defecto.");
+        return new SitioSkyNovels();
     }
 }

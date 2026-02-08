@@ -89,4 +89,19 @@ public class IndiceExtractor {
 
         return -1;
     }
+
+    public String obtenerSiguientePagina(String html, String urlBase) {
+        Document doc = Jsoup.parse(html, urlBase);
+        SitioWebConfig config = GestorSitios.obtenerConfig(urlBase);
+        
+        String selectorNext = config.getSelectorSiguientePaginaIndice();
+        
+        if (selectorNext != null) {
+            Element enlaceNext = doc.selectFirst(selectorNext);
+            if (enlaceNext != null) {
+                return enlaceNext.absUrl("href");
+            }
+        }
+        return null;
+    }
 }

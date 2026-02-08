@@ -37,6 +37,8 @@ public class Scraper {
         Map<String, Object> prefs = new HashMap<>();
         prefs.put("profile.managed_default_content_settings.images", 2);
         options.setExperimentalOption("prefs", prefs);
+        options.setExperimentalOption("excludeSwitches", java.util.Arrays.asList("enable-automation"));
+        options.setExperimentalOption("useAutomationExtension", false);
         options.addArguments("--disable-blink-features=AutomationControlled");
         options.addArguments("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
         options.addArguments("--blink-settings=imagesEnabled=false");
@@ -60,17 +62,9 @@ public class Scraper {
 
     public String obtenerHtmlDePagina() {
         try {
-            // 1. Averiguamos qué buscar según la configuración
-            String selectorContenido = configActual.getSelectorContenido(); 
-            
-            // 2. Esperamos a que el elemento EXISTA (para saber que la página cargó)
-            wait.until(ExpectedConditions.presenceOfElementLocated(
-                By.cssSelector(selectorContenido)
-            ));
-            
-            // 3. CAMBIO IMPORTANTE:
-            // Antes devolvíamos solo el elemento (lo que dejaba fuera el título).
-            // Ahora devolvemos TODA la página para que el Extractor tenga todo el contexto.
+            String selectorContenido = configActual.getSelectorContenido();
+            WebDriverWait waitLargo = new WebDriverWait(driver, java.time.Duration.ofSeconds(30));
+            waitLargo.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(selectorContenido)));
             return driver.getPageSource(); 
 
         } catch (Exception e) {
@@ -79,7 +73,6 @@ public class Scraper {
         }
     }
 
-    // En Scraper.java
     public String obtenerHtmlDeIndice() {
         try {
             System.out.println("Esperando a que cargue la lista de capítulos...");
