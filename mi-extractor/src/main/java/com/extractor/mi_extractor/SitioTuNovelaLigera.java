@@ -8,7 +8,7 @@ public class SitioTuNovelaLigera extends SitioWebConfig {
     }
 
     @Override
-    public boolean soportaUrl(String url) {
+    public boolean esSoportado(String url) {
         return url.toLowerCase().contains("tunovelaligera");
     }
 

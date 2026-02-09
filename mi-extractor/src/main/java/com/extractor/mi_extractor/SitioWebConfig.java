@@ -2,7 +2,7 @@ package com.extractor.mi_extractor;
 public abstract class SitioWebConfig {
 
     public abstract String getNombreSitio();
-    public abstract boolean soportaUrl(String url);
+    public abstract boolean esSoportado(String url);
     public abstract String getSelectorContenido(); 
     public abstract String getSelectorTitulo();    
     public abstract String getSelectorContenedorIndice();
@@ -12,4 +12,5 @@ public abstract class SitioWebConfig {
     public String getSelectorSiguientePaginaIndice() {
         return null;
     }
+    
 }

@@ -15,7 +15,7 @@ public class GestorSitios {
 
     public static SitioWebConfig obtenerConfig(String url) {
         for (SitioWebConfig sitio : SITIOS_REGISTRADOS) {
-            if (sitio.soportaUrl(url)) {
+            if (sitio.esSoportado(url)) {
                 return sitio;
             }
         }

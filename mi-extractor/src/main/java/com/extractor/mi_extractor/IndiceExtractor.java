@@ -14,7 +14,7 @@ public class IndiceExtractor {
 
     public Map<Integer, String> extraerEnlaces(String html, String urlIndice) {
         Map<Integer, String> mapaCapitulos = new HashMap<>();
-        Document doc = Jsoup.parse(html);
+        Document doc = Jsoup.parse(html, urlIndice); 
 
         SitioWebConfig config = GestorSitios.obtenerConfig(urlIndice);
 
@@ -42,10 +42,13 @@ public class IndiceExtractor {
                 }
 
                 if (enlace != null) {
-                    String urlCapitulo = enlace.attr("href");
-                    String textoTitulo = "";
+                    String urlCapitulo = enlace.absUrl("href");
+                    if (urlCapitulo.isEmpty()) urlCapitulo = enlace.attr("href");
 
-                    Element elementoNumero = elemento.selectFirst(selectorNumero);
+                    String textoTitulo = "";
+                    Element elementoNumero = (selectorNumero != null && !selectorNumero.equals("a")) ? 
+                                             elemento.selectFirst(selectorNumero) : null;
+                    
                     if (elementoNumero != null) {
                         textoTitulo = elementoNumero.text();
                     } else {
@@ -53,6 +56,9 @@ public class IndiceExtractor {
                     }
 
                     int numeroCap = extraerNumero(textoTitulo);
+                    if (numeroCap <= 0) {
+                        numeroCap = extraerNumeroDesdeUrl(urlCapitulo);
+                    }
 
                     if (numeroCap > 0) {
                         mapaCapitulos.put(numeroCap, urlCapitulo);
@@ -71,37 +77,30 @@ public class IndiceExtractor {
         
         Pattern patternEstandar = Pattern.compile("(?i)(?:Cap[íi]tulo|Ch\\.|Vol\\.|Episodio)\\s*(\\d+)");
         Matcher matcherEstandar = patternEstandar.matcher(texto);
-        if (matcherEstandar.find()) {
-            return Integer.parseInt(matcherEstandar.group(1));
-        }
+        if (matcherEstandar.find()) return Integer.parseInt(matcherEstandar.group(1));
         
         Pattern patternSiglas = Pattern.compile("^[A-Za-z]{2,5}\\s+(\\d+)");
         Matcher matcherSiglas = patternSiglas.matcher(texto);
-        if (matcherSiglas.find()) {
-            return Integer.parseInt(matcherSiglas.group(1));
-        }
+        if (matcherSiglas.find()) return Integer.parseInt(matcherSiglas.group(1));
 
         Pattern patternGenerico = Pattern.compile("(\\d+)");
         Matcher matcherGenerico = patternGenerico.matcher(texto);
-        if (matcherGenerico.find()) {
-            return Integer.parseInt(matcherGenerico.group(1));
-        }
+        if (matcherGenerico.find()) return Integer.parseInt(matcherGenerico.group(1));
 
         return -1;
     }
 
-    public String obtenerSiguientePagina(String html, String urlBase) {
-        Document doc = Jsoup.parse(html, urlBase);
-        SitioWebConfig config = GestorSitios.obtenerConfig(urlBase);
+    private int extraerNumeroDesdeUrl(String url) {
+        if (url == null || url.isEmpty()) return -1;
         
-        String selectorNext = config.getSelectorSiguientePaginaIndice();
+        Pattern patternCapitulo = Pattern.compile("(?i)cap[ií]tulo[-_\\s]*?(\\d+)");
+        Matcher matcher = patternCapitulo.matcher(url);
+        if (matcher.find()) return Integer.parseInt(matcher.group(1));
         
-        if (selectorNext != null) {
-            Element enlaceNext = doc.selectFirst(selectorNext);
-            if (enlaceNext != null) {
-                return enlaceNext.absUrl("href");
-            }
-        }
-        return null;
+        Pattern patternNum = Pattern.compile("(\\d+)");
+        Matcher matcherNum = patternNum.matcher(url);
+        if (matcherNum.find()) return Integer.parseInt(matcherNum.group(1));
+
+        return -1;
     }
 }
