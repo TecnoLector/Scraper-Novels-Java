@@ -435,19 +435,51 @@ public class MenuExtractor {
     }
 
     private static Map<Integer, String> obtenerTodosLosCapitulos(String urlPortada) {
-        System.out.println("Obteniendo lista de capítulos desde: " + urlPortada);
+        System.out.println("Obteniendo lista de capítulos...");
+        Map<Integer, String> mapaTotal = new HashMap<>();
 
         Scraper scraper = new Scraper();
-        scraper.navegarA(urlPortada);
-        String htmlIndice = scraper.obtenerHtmlDeIndice();
-        
-        scraper.cerrar();
+        IndiceExtractor extractor = new IndiceExtractor();
 
-        if (htmlIndice != null && !htmlIndice.isEmpty()) {
-            IndiceExtractor extractor = new IndiceExtractor();
-            return extractor.extraerEnlaces(htmlIndice, urlPortada);
-        } else {
-            return new HashMap<>(); // Retornamos mapa vacío si falló
+        String urlActual = urlPortada;
+        int pagina = 1;
+
+        // BUCLE DE PAGINACIÓN
+        while (urlActual != null) {
+            System.out.println(">>> Analizando índice - Página " + pagina + "...");
+            scraper.navegarA(urlActual);
+
+            // Pequeña pausa para evitar bloqueos
+            try { Thread.sleep(2000); } catch (InterruptedException e) {}
+            
+            String htmlIndice = scraper.obtenerHtmlDeIndice();
+            if (htmlIndice == null) break;
+
+            // 1. Extraer capítulos de ESTA página
+            Map<Integer, String> capitulosPagina = extractor.extraerEnlaces(htmlIndice, urlActual);
+
+            if (capitulosPagina.isEmpty()) {
+                System.out.println("⚠ No se encontraron capítulos en la página " + pagina + ".");
+                if (pagina == 1) break; // Si falla la primera, salimos
+            } else {
+                mapaTotal.putAll(capitulosPagina);
+                System.out.println("    -> Encontrados " + capitulosPagina.size() + " caps. (Total acumulado: " + mapaTotal.size() + ")");
+            }
+
+            // 2. Buscar si hay SIGUIENTE página
+            String urlSiguiente = extractor.obtenerSiguientePagina(htmlIndice, urlActual);
+
+            if (urlSiguiente != null && !urlSiguiente.equals(urlActual)) {
+                System.out.println(">>> Detectada siguiente página: " + urlSiguiente);
+                urlActual = urlSiguiente;
+                pagina++;
+            } else {
+                System.out.println(">>> Fin del índice (No se detectaron más páginas).");
+                urlActual = null; // Rompe el bucle
+            }
         }
+
+        scraper.cerrar();
+        return mapaTotal;
     }
 }

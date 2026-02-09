@@ -90,6 +90,37 @@ public class IndiceExtractor {
         return -1;
     }
 
+    public String obtenerSiguientePagina(String html, String urlBase) {
+        if (html == null || urlBase == null) return null;
+
+        try {
+            SitioWebConfig config = GestorSitios.obtenerConfig(urlBase);
+            if (config == null || config.getSelectorSiguientePaginaIndice() == null) {
+                return null; // Si no hay selector definido, asumimos que no hay paginación (ej. SkyNovels)
+            }
+
+            Document doc = Jsoup.parse(html, urlBase);
+            String selectorNext = config.getSelectorSiguientePaginaIndice();
+            
+            // Buscamos el elemento
+            Element enlaceNext = doc.selectFirst(selectorNext);
+            
+            if (enlaceNext != null) {
+                String siguienteUrl = enlaceNext.absUrl("href");
+                System.out.println(">>> Detectada siguiente página: " + siguienteUrl);
+                
+                if (siguienteUrl != null && !siguienteUrl.equals(urlBase)) {
+                    return siguienteUrl;
+                }
+            } else {
+                 System.out.println(">>> Fin del índice (No se encontró botón 'Siguiente' o '>>').");
+            }
+        } catch (Exception e) {
+            System.err.println("Advertencia al buscar siguiente página: " + e.getMessage());
+        }
+        return null;
+    }
+
     private int extraerNumeroDesdeUrl(String url) {
         if (url == null || url.isEmpty()) return -1;
         

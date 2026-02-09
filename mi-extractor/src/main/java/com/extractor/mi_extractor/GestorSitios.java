@@ -10,6 +10,7 @@ public class GestorSitios {
     static {
         SITIOS_REGISTRADOS.add(new SitioNovelasLigera());
         SITIOS_REGISTRADOS.add(new SitioTuNovelaLigera());
+        SITIOS_REGISTRADOS.add(new SitioNOVA());
         SITIOS_REGISTRADOS.add(new SitioSkyNovels());
     }
 

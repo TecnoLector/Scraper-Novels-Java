@@ -29,7 +29,7 @@ public class SitioTuNovelaLigera extends SitioWebConfig {
 
     @Override
     public String getSelectorElementoLista() {
-        return "ul[class*='lcp_catlist'] > ul > li";
+        return "ul[class*='lcp_catlist'] li";
     }
 
     @Override
@@ -43,6 +43,6 @@ public class SitioTuNovelaLigera extends SitioWebConfig {
     }
     @Override
     public String getSelectorSiguientePaginaIndice() {
-        return "ul[id^='lcp_paginator'] li a.lcp_nextlink, ul[id^='lcp_paginator'] li a:contains(>>)";
+        return "a.lcp_nextlink";
     }
 }

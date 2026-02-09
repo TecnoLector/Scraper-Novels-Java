@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -18,6 +19,7 @@ import java.util.Map;
 import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
@@ -157,6 +159,7 @@ public class EditorXHTML {
                 System.out.println("6. Generar Archivo de Índice (toc.xhtml)");
                 System.out.println("7. CREAR Archivo EPUB...");
                 System.out.println("8. Reparar Errores Comunes (.xhtml)");
+                System.out.println("9. Analizar Faltantes");
             } else {
                 System.out.println("\n[No se encontraron archivos .xhtml]");
             }
@@ -233,6 +236,12 @@ public class EditorXHTML {
                 case 8:
                     if (hayXHTML)
                         repararErroresComunes();
+                    else
+                        sinOpcion();
+                    break;
+                case 9:
+                    if (hayXHTML)
+                        analizarCapitulosFaltantes();
                     else
                         sinOpcion();
                     break;
@@ -712,6 +721,10 @@ public class EditorXHTML {
 
     private void generarTocXHTML() {
         System.out.println("Generando 'toc.xhtml'...");
+        
+        // CORRECCIÓN 1: Ruta correcta dentro de OEBPS/Text
+        Path rutaToc = Paths.get(rutaCarpeta, "OEBPS", "Text", "toc.xhtml");
+        
         StringBuilder tocBuilder = new StringBuilder();
         tocBuilder.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
                 .append("<!DOCTYPE html>\n")
@@ -719,7 +732,8 @@ public class EditorXHTML {
                 .append("<head>\n")
                 .append("    <meta charset=\"UTF-8\"/>\n")
                 .append("    <title>Tabla de Contenidos</title>\n")
-                .append("    <link rel=\"stylesheet\" type=\"text/css\" href=\"Styles/stylesheet.css\"/>\n")
+                // CORRECCIÓN 2: Ruta relativa correcta para CSS (subir un nivel)
+                .append("    <link rel=\"stylesheet\" type=\"text/css\" href=\"../Styles/stylesheet.css\"/>\n")
                 .append("</head>\n")
                 .append("<body>\n")
                 .append("    <nav epub:type=\"toc\" id=\"toc\">\n")
@@ -727,24 +741,22 @@ public class EditorXHTML {
                 .append("        <ol>\n");
 
         for (File archivo : archivosXHTML) {
-            if (archivo.getName().equalsIgnoreCase("toc.xhtml"))
-                continue;
+            // Evitar que el TOC se enlace a sí mismo
+            if (archivo.getName().equalsIgnoreCase("toc.xhtml")) continue;
 
             try {
                 Document doc = Jsoup.parse(archivo, "UTF-8");
                 Element h1 = doc.selectFirst("h1");
                 String tituloRaw = (h1 != null) ? h1.text() : archivo.getName().replace(".xhtml", "");
-                String tituloLimpio = tituloRaw.replace("&", "&amp;")
-                        .replace("<", "&lt;")
-                        .replace(">", "&gt;")
-                        .replace("\"", "&quot;");
+                
+                // Limpieza básica de entidades
+                String tituloLimpio = tituloRaw.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+                
+                // Codificación de URL para espacios y caracteres especiales
                 String nombreArchivo = archivo.getName();
-                String hrefCodificado = URLEncoder.encode(nombreArchivo, StandardCharsets.UTF_8.toString())
-                        .replace("+", "%20")
-                        .replace("%2E", ".");
+                String hrefCodificado = URLEncoder.encode(nombreArchivo, StandardCharsets.UTF_8.toString()).replace("+", "%20").replace("%2E", ".");
 
-                tocBuilder.append("            <li><a href=\"").append(hrefCodificado).append("\">")
-                        .append(tituloLimpio).append("</a></li>\n");
+                tocBuilder.append("            <li><a href=\"").append(hrefCodificado).append("\">").append(tituloLimpio).append("</a></li>\n");
 
             } catch (IOException e) {
                 System.err.println("Advertencia: No se pudo leer " + archivo.getName());
@@ -754,8 +766,10 @@ public class EditorXHTML {
         tocBuilder.append("        </ol>\n").append("    </nav>\n").append("</body>\n").append("</html>");
 
         try {
-            Files.writeString(Paths.get(rutaCarpeta, "toc.xhtml"), tocBuilder.toString(), StandardCharsets.UTF_8);
-            System.out.println("'toc.xhtml' generado correctamente.");
+            // Aseguramos que la carpeta existe (debería, porque ahí están los .xhtml)
+            Files.createDirectories(rutaToc.getParent());
+            Files.writeString(rutaToc, tocBuilder.toString(), StandardCharsets.UTF_8);
+            System.out.println("'toc.xhtml' generado correctamente en: " + rutaToc);
         } catch (IOException e) {
             System.err.println("Error grave al guardar 'toc.xhtml': " + e.getMessage());
         }
@@ -1422,6 +1436,61 @@ public class EditorXHTML {
             this.tituloOriginal = tituloOriginal;
             this.tituloNuevo = tituloNuevo;
             this.promoverTag = promoverTag;
+        }
+    }
+
+    private void analizarCapitulosFaltantes() {
+        System.out.println("\n--- Análisis de Integridad de Capítulos ---");
+        
+        List<Integer> encontrados = new ArrayList<>();
+        // Busca números en los nombres de archivo (ej: "Capitulo0023.xhtml" -> 23)
+        Pattern patronNumero = Pattern.compile("(\\d+)"); 
+
+        for (File archivo : archivosXHTML) {
+            if (archivo.getName().toLowerCase().contains("toc") || archivo.getName().toLowerCase().contains("info")) {
+                continue; // Ignorar índice y metadatos
+            }
+            
+            Matcher m = patronNumero.matcher(archivo.getName());
+            if (m.find()) {
+                try {
+                    encontrados.add(Integer.parseInt(m.group(1)));
+                } catch (Exception e) {} 
+            }
+        }
+
+        Collections.sort(encontrados);
+
+        if (encontrados.isEmpty()) {
+            System.out.println("-> No se detectaron números en los nombres de archivo.");
+            System.out.println("Recomendación: Usa la opción '2. Renombrar Archivos' primero.");
+            return;
+        }
+
+        int max = encontrados.get(encontrados.size() - 1);
+        int total = encontrados.size();
+
+        System.out.println("Resumen:");
+        System.out.println(" -> Archivos numéricos encontrados: " + total);
+        System.out.println(" -> Último capítulo detectado: " + max);
+
+        List<Integer> faltantes = new ArrayList<>();
+        for (int i = 1; i <= max; i++) {
+            if (!encontrados.contains(i)) {
+                faltantes.add(i);
+            }
+        }
+
+        if (faltantes.isEmpty()) {
+            System.out.println("\n ¡SECUENCIA COMPLETA! Tienes todos los capítulos del 1 al " + max);
+        } else {
+            System.out.println("\n SE DETECTARON " + faltantes.size() + " HUECOS.");
+            System.out.println("Lista de capítulos faltantes (para copiar en el Extractor):");
+            System.out.println("--------------------------------------------------");
+            // Genera la lista separada por comas: "1,4,5,10"
+            String listaCopiable = faltantes.stream().map(String::valueOf).collect(Collectors.joining(", "));
+            System.out.println(listaCopiable);
+            System.out.println("--------------------------------------------------");
         }
     }
 }
