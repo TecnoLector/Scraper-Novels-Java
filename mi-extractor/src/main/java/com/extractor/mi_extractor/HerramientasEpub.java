@@ -4,11 +4,14 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
-import nl.siegmann.epublib.domain.Book;
-import nl.siegmann.epublib.domain.Resource;
-import nl.siegmann.epublib.epub.EpubWriter;
-import nl.siegmann.epublib.domain.MediaType;
-import nl.siegmann.epublib.service.MediatypeService;
+
+// --- CAMBIO DE LIBRERÍA A EPUB4J ---
+import io.documentnode.epub4j.domain.Book;
+import io.documentnode.epub4j.domain.Resource;
+import io.documentnode.epub4j.epub.EpubWriter;
+import io.documentnode.epub4j.domain.MediaType;
+import io.documentnode.epub4j.domain.MediaTypes;
+import io.documentnode.epub4j.domain.Author;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -80,6 +83,7 @@ public class HerramientasEpub {
             System.out.println("8. Dividir un EPUB por rango de capítulos");
             System.out.println("9. Descomprimir un EPUB (Extraer archivos)");
             System.out.println("10. Re-empaquetar carpeta como EPUB");
+            System.out.println("11. Convetir EPUB de v2 a v3");
             System.out.println("0. Volver al menú principal");
             System.out.print("Elige una herramienta: ");
 
@@ -132,6 +136,12 @@ public class HerramientasEpub {
                     break;
                 case 10:
                     reempaquetarComoEpub();
+                    break;
+                case 11:
+                    System.out.println("Nombre del EPUB 2 a convertir:");
+                    String original = scanner.nextLine();
+                    String nuevo = original.replace(".epub", "_v3.epub");
+                    convertirAEpub3ConCalibre(original, nuevo);
                     break;
                 case 0:
                     return;
@@ -498,7 +508,7 @@ public class HerramientasEpub {
 
             // --- 1. AÑADIR METADATOS ---
             libro.getMetadata().addTitle(tituloLibro);
-            libro.getMetadata().addAuthor(new nl.siegmann.epublib.domain.Author(autorLibro));
+            libro.getMetadata().addAuthor(new Author(autorLibro));
             if (sinopsis != null && !sinopsis.isEmpty()) {
                 libro.getMetadata().addDescription(sinopsis);
             }
@@ -513,7 +523,7 @@ public class HerramientasEpub {
             // --- 2. AÑADIR HOJA DE ESTILO CSS ---
             if (rutaCss != null && Files.exists(rutaCss)) {
                 Resource cssResource = new Resource(new FileInputStream(rutaCss.toFile()), nombreCss);
-                cssResource.setMediaType(MediatypeService.CSS); // Especificamos que es CSS
+                cssResource.setMediaType(MediaTypes.CSS); // Especificamos que es CSS
                 libro.getResources().add(cssResource);
                 System.out.println("Archivo CSS '" + nombreCss + "' empaquetado.");
             }
@@ -525,9 +535,9 @@ public class HerramientasEpub {
 
                 // Especificamos el tipo de imagen
                 if (nombrePortada.toLowerCase().endsWith(".png")) {
-                    coverResource.setMediaType(MediatypeService.PNG);
+                    coverResource.setMediaType(MediaTypes.PNG);
                 } else {
-                    coverResource.setMediaType(MediatypeService.JPG);
+                    coverResource.setMediaType(MediaTypes.JPG);
                 }
 
                 libro.setCoverImage(coverResource);
@@ -595,7 +605,8 @@ public class HerramientasEpub {
 
         try {
             // 1. Cargar el libro original
-            Book libroOriginal = new nl.siegmann.epublib.epub.EpubReader()
+            // OJO: Cambio a io.documentnode.epub4j.epub.EpubReader
+            Book libroOriginal = new io.documentnode.epub4j.epub.EpubReader()
                     .readEpub(new FileInputStream(rutaEpubOriginal.toFile()));
 
             // 2. Crear un libro nuevo
@@ -621,7 +632,7 @@ public class HerramientasEpub {
             // 5. Añadir SÓLO los capítulos del rango
             for (int i = (inicio - 1); i <= (fin - 1); i++) {
                 Resource capitulo = todosLosCapitulos.get(i);
-                nl.siegmann.epublib.domain.TOCReference tocRef = findTocRefByResource(
+                io.documentnode.epub4j.domain.TOCReference tocRef = findTocRefByResource(
                         libroOriginal.getTableOfContents().getTocReferences(), capitulo);
 
                 // Obtenemos el título de la referencia (si existe)
@@ -640,9 +651,9 @@ public class HerramientasEpub {
         }
     }
 
-    private nl.siegmann.epublib.domain.TOCReference findTocRefByResource(
-            List<nl.siegmann.epublib.domain.TOCReference> tocReferences,
-            nl.siegmann.epublib.domain.Resource resource) {
+    private io.documentnode.epub4j.domain.TOCReference findTocRefByResource(
+            List<io.documentnode.epub4j.domain.TOCReference> tocReferences,
+            io.documentnode.epub4j.domain.Resource resource) {
 
         // Si la lista es nula o vacía, no hay nada que buscar.
         if (tocReferences == null || tocReferences.isEmpty()) {
@@ -650,7 +661,7 @@ public class HerramientasEpub {
         }
 
         // Iteramos sobre cada entrada del TOC en este nivel
-        for (nl.siegmann.epublib.domain.TOCReference tocRef : tocReferences) {
+        for (io.documentnode.epub4j.domain.TOCReference tocRef : tocReferences) {
 
             // Comparamos el recurso de esta entrada con el que buscamos.
             if (resource.equals(tocRef.getResource())) {
@@ -658,7 +669,7 @@ public class HerramientasEpub {
             }
 
             // Si no es este, buscamos en los hijos (sub-capítulos) de esta entrada
-            nl.siegmann.epublib.domain.TOCReference foundInChildren = findTocRefByResource(tocRef.getChildren(),
+            io.documentnode.epub4j.domain.TOCReference foundInChildren = findTocRefByResource(tocRef.getChildren(),
                     resource);
 
             // Si se encontró en la búsqueda recursiva, lo retornamos
@@ -835,5 +846,33 @@ public class HerramientasEpub {
     private void registrarProblema(Map<File, List<String>> mapa, File archivo, Element elemento) {
         mapa.computeIfAbsent(archivo, k -> new ArrayList<>())
                 .add("<" + elemento.tagName() + ">: \"" + elemento.text() + "\"");
+    }
+
+    public void convertirAEpub3ConCalibre(String rutaInput, String rutaOutput) {
+        try {
+            // El comando mágico de Calibre
+            // Asegúrate de que 'ebook-convert' sea reconocido o pon la ruta completa:
+            // Ej: "C:\\Program Files\\Calibre2\\ebook-convert.exe"
+            List<String> comando = new ArrayList<>();
+            comando.add("ebook-convert");
+            comando.add(rutaInput);
+            comando.add(rutaOutput);
+            comando.add("--epub-version");
+            comando.add("3");
+
+            ProcessBuilder pb = new ProcessBuilder(comando);
+            pb.inheritIO(); // Para ver lo que hace Calibre en tu consola
+            Process proceso = pb.start();
+
+            int codigoSalida = proceso.waitFor();
+            if (codigoSalida == 0) {
+                System.out.println("✅ ¡Conversión a EPUB 3 exitosa con Calibre!");
+            } else {
+                System.err.println("❌ Hubo un error al llamar a Calibre.");
+            }
+        } catch (Exception e) {
+            System.err.println("Error: Asegúrate de tener Calibre instalado y en el PATH.");
+            e.printStackTrace();
+        }
     }
 }

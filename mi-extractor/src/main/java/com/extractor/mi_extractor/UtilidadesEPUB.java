@@ -12,7 +12,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map; // Necesario para crearEpubDividido si copia otherProperties
+import java.util.Map;
 import java.util.Scanner;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -20,22 +20,22 @@ import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
-import javax.xml.namespace.QName; // Para metadatos personalizados (opcional)
-import java.util.HashMap; // Para el mapa
-import java.util.Map;
-import java.util.regex.Matcher; // Para extraer número del nombre
-import java.util.regex.Pattern; // Para extraer número del nombre
-import nl.siegmann.epublib.domain.SpineReference;
+import javax.xml.namespace.QName;
+import java.util.HashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.Comparator;
+import java.util.Collections;
 
-import nl.siegmann.epublib.domain.Book;
-import nl.siegmann.epublib.domain.Metadata;
-import nl.siegmann.epublib.domain.Resource;
-import nl.siegmann.epublib.domain.Spine;
-import nl.siegmann.epublib.domain.TOCReference;
-import nl.siegmann.epublib.epub.EpubReader;
-import nl.siegmann.epublib.epub.EpubWriter;
-import nl.siegmann.epublib.service.MediatypeService;
+import io.documentnode.epub4j.domain.SpineReference;
+import io.documentnode.epub4j.domain.Book;
+import io.documentnode.epub4j.domain.Metadata;
+import io.documentnode.epub4j.domain.Resource;
+import io.documentnode.epub4j.domain.Spine;
+import io.documentnode.epub4j.domain.TOCReference;
+import io.documentnode.epub4j.epub.EpubReader;
+import io.documentnode.epub4j.epub.EpubWriter;
+import io.documentnode.epub4j.domain.MediaTypes;
 
 public class UtilidadesEPUB {
 
@@ -64,7 +64,8 @@ public class UtilidadesEPUB {
             System.out.println("1. Dividir EPUB...");
             System.out.println("2. Descomprimir un EPUB");
             System.out.println("3. Re-empaquetar carpeta como EPUB");
-            System.out.println("4. Insertar páginas de 'Inicio de Libro'");
+            System.out.println("4. Insertar paginas de 'Inicio de Libro'");
+            System.out.println("5. Convetir EPUB de v2 a v3");
             System.out.println("0. Volver al menú principal");
             System.out.print("Elige una herramienta: ");
 
@@ -89,8 +90,38 @@ public class UtilidadesEPUB {
                 case 4:
                     insertarPaginasDeLibro();
                     break;
-                case 0:
-                    return;
+                case 5:
+                    System.out.println("Nombre del EPUB 2 a convertir (ej: Libro.epub):");
+                    String nombreArchivo = scanner.nextLine().trim();
+                    Path rutaInput = Paths.get(this.rutaCarpeta, nombreArchivo);
+                    String nombreSalida = nombreArchivo.toLowerCase().endsWith(".epub")
+                            ? nombreArchivo.substring(0, nombreArchivo.length() - 5) + "_v3.epub"
+                            : nombreArchivo + "_v3.epub";
+                    Path rutaOutput = Paths.get(this.rutaCarpeta, nombreSalida);
+
+                    if (!Files.exists(rutaInput)) {
+                        System.err.println("\n❌ Error: Java no ve el archivo: " + nombreArchivo);
+                        System.err.println("Ruta buscada: " + rutaInput.toAbsolutePath());
+
+                        System.out.println("\n--- Archivos disponibles en esta carpeta ---");
+                        File carpetaActual = new File(this.rutaCarpeta);
+                        File[] listaArchivos = carpetaActual.listFiles((dir, name) -> name.endsWith(".epub"));
+
+                        if (listaArchivos != null && listaArchivos.length > 0) {
+                            for (File f : listaArchivos) {
+                                System.out.println(" -> " + f.getName());
+                            }
+                            System.out.println("--------------------------------------------");
+                            System.out.println("Consejo: Copia y pega el nombre EXACTO de la lista de arriba.");
+                        } else {
+                            System.err.println("(La carpeta parece vacía o no tiene archivos .epub)");
+                        }
+                        break;
+                    }
+
+                    // Si llegamos aquí, el archivo existe. Ejecutamos Calibre.
+                    convertirAEpub3ConCalibre(rutaInput.toString(), rutaOutput.toString());
+                    break;
                 default:
                     System.out.println("Opción no válida.");
             }
@@ -401,7 +432,8 @@ public class UtilidadesEPUB {
             Files.createDirectories(rutaSubcarpeta);
             System.out.println("Los libros se guardarán en la subcarpeta: " + nombreSubcarpeta);
         } catch (IOException e) {
-            System.err.println("Error al crear la subcarpeta de destino '" + nombreSubcarpeta + "': " + e.getMessage());
+            System.err.println(
+                    "Error al crear la subcarpeta de destino '" + nombreSubcarpeta + "': " + e.getMessage());
             return;
         }
 
@@ -545,7 +577,7 @@ public class UtilidadesEPUB {
                 sitioExtraccion, creadorArchivo);
         Resource paginaMetaResource = new Resource(paginaMetaHtml.getBytes(StandardCharsets.UTF_8),
                 "OEBPS/Text/metadata_page.xhtml");
-        paginaMetaResource.setMediaType(MediatypeService.XHTML);
+        paginaMetaResource.setMediaType(MediaTypes.XHTML);
         libroDividido.getResources().add(paginaMetaResource);
         libroDividido.addSection("Información del Libro", paginaMetaResource);
         System.out.println(" -> Página de metadatos generada.");
@@ -645,21 +677,21 @@ public class UtilidadesEPUB {
         return sb.toString();
     }
 
-    private nl.siegmann.epublib.domain.TOCReference findTocRefByResource(
-            List<nl.siegmann.epublib.domain.TOCReference> tocReferences,
-            nl.siegmann.epublib.domain.Resource resource) {
+    private TOCReference findTocRefByResource(
+            List<TOCReference> tocReferences,
+            Resource resource) {
 
         if (tocReferences == null || tocReferences.isEmpty()) {
             return null;
         }
 
-        for (nl.siegmann.epublib.domain.TOCReference tocRef : tocReferences) {
+        for (TOCReference tocRef : tocReferences) {
 
             if (resource.equals(tocRef.getResource())) {
                 return tocRef; // ¡Encontrado!
             }
 
-            nl.siegmann.epublib.domain.TOCReference foundInChildren = findTocRefByResource(tocRef.getChildren(),
+            TOCReference foundInChildren = findTocRefByResource(tocRef.getChildren(),
                     resource);
 
             if (foundInChildren != null) {
@@ -745,6 +777,7 @@ public class UtilidadesEPUB {
         String nombreCarpetaFuente = scanner.nextLine();
         Path rutaCarpetaFuente = Paths.get(rutaCarpeta, nombreCarpetaFuente);
 
+        // --- Validaciones Esenciales ---
         if (!Files.isDirectory(rutaCarpetaFuente)) {
             System.err.println("Error: La carpeta '" + nombreCarpetaFuente + "' no existe.");
             return;
@@ -758,28 +791,47 @@ public class UtilidadesEPUB {
             System.err.println("Error: La carpeta no contiene el directorio 'META-INF'.");
             return;
         }
+        // ---------------------------------
 
         System.out.println("Introduce el nombre del nuevo archivo EPUB de salida (ej: MiLibro_final.epub):");
         String nombreEpubSalida = scanner.nextLine();
         Path rutaEpubSalida = Paths.get(rutaCarpeta, nombreEpubSalida);
 
         try (
+                // 1. Creamos el archivo .epub de salida
                 FileOutputStream fos = new FileOutputStream(rutaEpubSalida.toFile());
                 ZipOutputStream zos = new ZipOutputStream(fos)) {
             System.out.println("Empaquetando...");
 
+            // --- REGLA 1 y 2: Añadir 'mimetype' PRIMERO y SIN COMPRESIÓN ---
+
+            // Leemos los bytes del archivo mimetype
             byte[] mimetypeBytes = Files.readAllBytes(rutaMimetype);
+
+            // Creamos una entrada Zip
             ZipEntry mimetypeEntry = new ZipEntry("mimetype");
+
+            // REGLA 2: Sin compresión (STORED)
             mimetypeEntry.setMethod(ZipEntry.STORED);
+
+            // Para el método STORED, necesitamos saber el tamaño y el CRC-32 ANTES de
+            // escribirlo
             mimetypeEntry.setSize(mimetypeBytes.length);
             mimetypeEntry.setCompressedSize(mimetypeBytes.length);
             CRC32 crc = new CRC32();
             crc.update(mimetypeBytes);
             mimetypeEntry.setCrc(crc.getValue());
+
+            // REGLA 1: Escribimos la entrada 'mimetype' PRIMERO
             zos.putNextEntry(mimetypeEntry);
             zos.write(mimetypeBytes);
             zos.closeEntry();
 
+            // --- FIN DE REGLAS ESPECIALES ---
+
+            // 3. Añadimos el RESTO de archivos (comprimidos)
+
+            // Usamos Files.walk para recorrer recursivamente todas las carpetas y archivos
             try (Stream<Path> paths = Files.walk(rutaCarpetaFuente)) {
 
                 paths.filter(Files::isRegularFile)
@@ -935,8 +987,8 @@ public class UtilidadesEPUB {
 
             String hrefPagina = "OEBPS/Text/info_libro_" + (insercionesHechas + 1) + ".xhtml";
             Resource res = new Resource(htmlPagina.getBytes(StandardCharsets.UTF_8), hrefPagina);
-            res.setMediaType(MediatypeService.XHTML);
-            libroOriginal.getResources().add(res); 
+            res.setMediaType(MediaTypes.XHTML);
+            libroOriginal.getResources().add(res);
 
             int indiceRealInsercion = pagina.indiceSpineEncontrado + 1 + insercionesHechas;
             libroOriginal.getSpine().getSpineReferences().add(indiceRealInsercion, new SpineReference(res));
@@ -1018,6 +1070,48 @@ public class UtilidadesEPUB {
         public PaginaInsertar(String nombreLibro, int numeroCapituloAnterior) {
             this.nombreLibro = nombreLibro;
             this.numeroCapituloAnterior = numeroCapituloAnterior;
+        }
+    }
+
+    public void convertirAEpub3ConCalibre(String rutaInput, String rutaOutput) {
+        try {
+            String rutaEjecutable = "C:\\Program Files\\Calibre2\\ebook-convert.exe";
+
+            File ejecutable = new File(rutaEjecutable);
+
+            if (!ejecutable.exists()) {
+                System.err.println("❌ Error: No encuentro el archivo 'ebook-convert.exe' en: " + rutaEjecutable);
+                System.err.println("Asegurate de que está instalado ahí.");
+                return;
+            }
+
+            System.out.println("✅ Usando motor de conversión: " + rutaEjecutable);
+
+            List<String> comando = new ArrayList<>();
+            comando.add(rutaEjecutable);
+            comando.add(rutaInput);
+            comando.add(rutaOutput);
+            comando.add("--epub-version");
+            comando.add("3");
+
+            ProcessBuilder pb = new ProcessBuilder(comando);
+            pb.inheritIO();
+
+            System.out.println("Convirtiendo a EPUB 3... Por favor espera.");
+            Process proceso = pb.start();
+
+            int codigoSalida = proceso.waitFor();
+
+            if (codigoSalida == 0) {
+                System.out.println("--¡Conversion exitosa!--");
+                System.out.println("Archivo guardado: " + rutaOutput);
+            } else {
+                System.err.println("Calibre fallo. Codigo de error: " + codigoSalida);
+            }
+
+        } catch (Exception e) {
+            System.err.println("Error al ejecutar: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 }

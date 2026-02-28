@@ -30,6 +30,10 @@
 		<java.version>21</java.version>
 	</properties>
 	<dependencies>
+	<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-thymeleaf</artifactId>
+</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter</artifactId>
@@ -40,6 +44,12 @@
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+
+		<dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+
     <dependency>
         <groupId>org.jsoup</groupId>
         <artifactId>jsoup</artifactId>
@@ -52,10 +62,15 @@
     </dependency>
 
 	<dependency>
-    <groupId>nl.siegmann.epublib</groupId>
-    <artifactId>epublib-core</artifactId>
-    <version>3.1</version>
-</dependency>
+        <groupId>io.documentnode</groupId>
+        <artifactId>epub4j-core</artifactId>
+        <version>4.2.2</version>
+    </dependency>
+	<dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-simple</artifactId>
+        <version>2.0.9</version>
+    </dependency>
 	</dependencies>
 
 	<build>
@@ -67,9 +82,5 @@
 		</plugins>
 	</build>
 	<repositories>
-    <repository>
-        <id>psiegman-repo</id>
-        <url>https://github.com/psiegman/mvn-repo/raw/master/releases</url>
-    </repository>
 </repositories>
 </project>

@@ -19,24 +19,23 @@ import java.util.Map;
 import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
-import nl.siegmann.epublib.domain.Book;
-import nl.siegmann.epublib.domain.Resource;
-import nl.siegmann.epublib.domain.TOCReference;
-import nl.siegmann.epublib.epub.EpubReader;
-import nl.siegmann.epublib.epub.EpubWriter;
-import nl.siegmann.epublib.service.MediatypeService;
+
+import io.documentnode.epub4j.domain.Book;
+import io.documentnode.epub4j.domain.Resource;
+import io.documentnode.epub4j.epub.EpubReader;
+import io.documentnode.epub4j.epub.EpubWriter;
+import io.documentnode.epub4j.domain.MediaTypes;
+import io.documentnode.epub4j.domain.Author;
+import io.documentnode.epub4j.domain.Date;
 
 public class EditorXHTML {
 
@@ -288,7 +287,6 @@ public class EditorXHTML {
                     } else
                         System.out.println("Opción no disponible.");
                     break;
-
                 case 0: // Salir
                     if (hayEPUB && cambiosPendientes) {
                         System.out.print(
@@ -791,7 +789,7 @@ public class EditorXHTML {
                     // Crear el recurso
                     Resource res = new Resource(new FileInputStream(path.toFile()), href);
                     // Determinar tipo (CSS, JPG, TTF, etc.) por la extensión
-                    res.setMediaType(MediatypeService.determineMediaType(path.getFileName().toString()));
+                    res.setMediaType(MediaTypes.determineMediaType(path.getFileName().toString()));
 
                     // Añadir el recurso al libro
                     libro.getResources().add(res);
@@ -807,7 +805,7 @@ public class EditorXHTML {
     }
 
     private void crearEpubConEpublib() {
-        System.out.println("--- Creando EPUB (Modo Epublib) ---");
+        System.out.println("--- Creando EPUB (Modo Epub4j) ---");
         System.out.println("Se escanearán automáticamente las carpetas OEBPS/Styles, Fonts, Images y Text.");
 
         // --- 1. Pedir Metadatos ---
@@ -829,7 +827,7 @@ public class EditorXHTML {
 
             // --- 2. Asignar Metadatos ---
             libro.getMetadata().addTitle(tituloLibro);
-            libro.getMetadata().addAuthor(new nl.siegmann.epublib.domain.Author(autorLibro));
+            libro.getMetadata().addAuthor(new Author(autorLibro)); // Uso de clase Author de epub4j
             if (sinopsis != null && !sinopsis.isEmpty()) {
                 libro.getMetadata().addDescription(sinopsis);
             }
@@ -871,7 +869,7 @@ public class EditorXHTML {
                     sitioExtraccion, creadorArchivo, this.archivosXHTML);
             Resource paginaMetaResource = new Resource(paginaMetaHtml.getBytes(StandardCharsets.UTF_8),
                     "Text/info_page.xhtml");
-            paginaMetaResource.setMediaType(MediatypeService.XHTML);
+            paginaMetaResource.setMediaType(MediaTypes.XHTML);
             libro.addSection("Información del Libro", paginaMetaResource);
 
             // --- 6. Añadir Todos los Capítulos (de OEBPS/Text) ---
@@ -879,7 +877,7 @@ public class EditorXHTML {
             for (File archivo : this.archivosXHTML) {
                 String href = "Text/" + archivo.getName();
                 Resource res = new Resource(new FileInputStream(archivo), href);
-                res.setMediaType(MediatypeService.XHTML);
+                res.setMediaType(MediaTypes.XHTML);
                 libro.addSection(archivo.getName().replace(".xhtml", ""), res);
             }
 
@@ -895,7 +893,7 @@ public class EditorXHTML {
             epubWriter.write(libro, new FileOutputStream(new File(rutaCarpeta, archivoSalida)));
 
             System.out.println("\n-----------------------------------");
-            System.out.println("¡EPUB (Modo Epublib) creado con éxito!: " + archivoSalida);
+            System.out.println("¡EPUB (Modo Epub4j) creado con éxito!: " + archivoSalida);
             System.out.println("-----------------------------------");
 
         } catch (IOException e) {
@@ -1257,9 +1255,9 @@ public class EditorXHTML {
                 Pattern.CASE_INSENSITIVE);
         int modificados = 0;
         System.out.println("Analizando títulos en memoria...");
-        for (nl.siegmann.epublib.domain.TOCReference tocRef : this.libro.getTableOfContents().getTocReferences()) {
+        for (io.documentnode.epub4j.domain.TOCReference tocRef : this.libro.getTableOfContents().getTocReferences()) {
             Resource recurso = tocRef.getResource();
-            if (recurso == null || !recurso.getMediaType().equals(MediatypeService.XHTML))
+            if (recurso == null || !recurso.getMediaType().equals(MediaTypes.XHTML))
                 continue;
             try {
                 String contenidoHtml = new String(recurso.getData(), StandardCharsets.UTF_8);
@@ -1298,7 +1296,7 @@ public class EditorXHTML {
         int modificados = 0;
         System.out.println("Limpiando encabezados basura en memoria...");
         for (Resource recurso : this.libro.getContents()) {
-            if (recurso == null || !recurso.getMediaType().equals(MediatypeService.XHTML))
+            if (recurso == null || !recurso.getMediaType().equals(MediaTypes.XHTML))
                 continue;
             try {
                 String contenidoHtml = new String(recurso.getData(), StandardCharsets.UTF_8);
@@ -1341,7 +1339,7 @@ public class EditorXHTML {
         int titulosInvalidos = 0;
         int titulosNoCoinciden = 0;
         for (Resource recurso : this.libro.getContents()) {
-            if (recurso == null || !recurso.getMediaType().equals(MediatypeService.XHTML))
+            if (recurso == null || !recurso.getMediaType().equals(MediaTypes.XHTML))
                 continue;
             try {
                 String contenidoHtml = new String(recurso.getData(), StandardCharsets.UTF_8);
@@ -1362,8 +1360,8 @@ public class EditorXHTML {
                 if (h1Element != null && titleElement != null) {
                     if (!h1Element.text().trim().equals(titleElement.text().trim())) {
                         System.out.println("Archivo: " + recurso.getHref() + " -> No coinciden:");
-                        System.out.println("  -> H1:    \"" + h1Element.text().trim() + "\"");
-                        System.out.println("  -> Title: \"" + titleElement.text().trim() + "\"");
+                        System.out.println("  -> H1:    \"" + h1Element.text().trim() + "\"");
+                        System.out.println("  -> Title: \"" + titleElement.text().trim() + "\"");
                         titulosNoCoinciden++;
                     }
                 } else {
@@ -1395,9 +1393,9 @@ public class EditorXHTML {
             Resource coverResource = new Resource(new FileInputStream(rutaPortada.toFile()),
                     "cover." + (nombrePortada.endsWith("png") ? "png" : "jpg"));
             if (nombrePortada.toLowerCase().endsWith(".png")) {
-                coverResource.setMediaType(MediatypeService.PNG);
+                coverResource.setMediaType(MediaTypes.PNG);
             } else {
-                coverResource.setMediaType(MediatypeService.JPG);
+                coverResource.setMediaType(MediaTypes.JPG);
             }
             this.libro.setCoverImage(coverResource);
             System.out.println("¡Imagen de portada actualizada en memoria!");
@@ -1488,7 +1486,7 @@ public class EditorXHTML {
             System.out.println("Lista de capítulos faltantes (para copiar en el Extractor):");
             System.out.println("--------------------------------------------------");
             // Genera la lista separada por comas: "1,4,5,10"
-            String listaCopiable = faltantes.stream().map(String::valueOf).collect(Collectors.joining(", "));
+            String listaCopiable = faltantes.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(", "));
             System.out.println(listaCopiable);
             System.out.println("--------------------------------------------------");
         }
