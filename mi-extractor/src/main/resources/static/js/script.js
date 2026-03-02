@@ -29,6 +29,8 @@ function setTheme(theme) {
 function actualizarFormulario() {
     const accion = document.getElementById('accionSelector').value;
     const display = document.getElementById('fileNameDisplay');
+    const fileInput = document.getElementById('fileInput');
+
     document.getElementById('cajaDividir').style.display = (accion === 'DIVIDIR') ? 'block' : 'none';
     document.getElementById('cajaInicioLibro').style.display = (accion === 'INICIO_LIBRO') ? 'block' : 'none';
     if (accion === 'REEMPAQUETAR') {
@@ -78,23 +80,52 @@ window.onload = function() {
 };
 
 // --- 3. LÓGICA DE ENVÍO AL SERVIDOR ---
+
 async function comenzarProceso() {
     const fileInput = document.getElementById('fileInput');
     const accion = document.getElementById('accionSelector').value;
+    const statusTxt = document.getElementById('statusTxt');
+    const pBar = document.getElementById('pBar');
+    const pContainer = document.getElementById('pContainer');
 
     if (fileInput.files.length === 0) {
         alert("⚠️ Selecciona un archivo o carpeta primero.");
         return;
     }
+
+    pContainer.style.display = 'block';
+    pBar.style.width = '0%';
+    pBar.className = 'progress-bar';
+    
     const formData = new FormData();
     formData.append("accion", accion);
+
     if (accion === 'REEMPAQUETAR') {
-        for (let file of fileInput.files) {
-            formData.append("files", file); 
+        if (fileInput.files.length > 1) {
+            statusTxt.innerHTML = '📦 <span style="color: var(--primary-color)">Comprimiendo carpeta en el navegador...</span>';
+            
+            try {
+                const zip = new JSZip();
+                for (let file of fileInput.files) {
+                    zip.file(file.webkitRelativePath || file.name, file);
+                }
+
+                const content = await zip.generateAsync({type: "blob"});
+                
+                formData.append("file", content, "carpeta_comprimida.zip");
+                
+            } catch (err) {
+                statusTxt.innerHTML = '❌ Error al comprimir: ' + err.message;
+                return;
+            }
+        } else {
+            formData.append("file", fileInput.files[0]);
         }
     } else {
         formData.append("file", fileInput.files[0]);
-    }if (accion === 'DIVIDIR') {
+    }
+
+    if (accion === 'DIVIDIR') {
         formData.append("tipoDivision", document.getElementById('tipoDivision').value);
         formData.append("parametro", document.getElementById('inputParametro').value);
         formData.append("sitio", document.getElementById('inputSitioDiv').value);
@@ -103,10 +134,8 @@ async function comenzarProceso() {
     if (accion === 'INICIO_LIBRO') {
         formData.append("sitio", document.getElementById('inputSitioInicio').value);
         formData.append("creador", document.getElementById('inputCreadorInicio').value);
-
         const nombres = document.querySelectorAll('.input-nombre-pag');
         const capitulos = document.querySelectorAll('.input-cap-pag');
-
         for (let i = 0; i < nombres.length; i++) {
             if (nombres[i].value && capitulos[i].value) {
                 formData.append("nombresPaginas", nombres[i].value);
@@ -115,16 +144,10 @@ async function comenzarProceso() {
         }
     }
 
-    // Resetear barra visualmente antes de empezar
-    const pBar = document.getElementById('pBar');
-    const pContainer = document.getElementById('pContainer');
-    const statusTxt = document.getElementById('statusTxt');
-    
-    pContainer.style.display = 'block';
-    pBar.style.width = '5%';
-    pBar.textContent = '';
-    pBar.className = 'progress-bar'; 
+    // --- ENVÍO AL SERVIDOR ---
     statusTxt.innerHTML = '⏳ <span style="color: var(--text-muted)">Subiendo archivo al servidor...</span>';
+    pBar.style.width = '10%';
+    pBar.textContent = 'Enviando...';
 
     try {
         const response = await fetch('/api/epub/upload', {
@@ -143,7 +166,6 @@ async function comenzarProceso() {
     } catch (error) {
         statusTxt.innerHTML = '<span style="color: var(--error-color)">❌ Error de conexión con el servidor.</span>';
         pBar.classList.add('error');
-        pBar.style.width = '100%';
     }
 }
 

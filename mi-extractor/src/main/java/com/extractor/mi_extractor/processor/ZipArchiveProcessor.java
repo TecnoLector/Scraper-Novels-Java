@@ -19,23 +19,7 @@ public class ZipArchiveProcessor {
             estados.put(id, "Descomprimiendo EPUB...");
             Path tempExtractDir = Files.createTempDirectory("extract_");
             
-            try (ZipInputStream zis = new ZipInputStream(new BufferedInputStream(new FileInputStream(inputEpub.toFile())))) {
-                ZipEntry zipEntry;
-                byte[] buffer = new byte[1024];
-                while ((zipEntry = zis.getNextEntry()) != null) {
-                    Path nuevoArchivo = tempExtractDir.resolve(zipEntry.getName());
-                    if (zipEntry.isDirectory()) {
-                        Files.createDirectories(nuevoArchivo);
-                    } else {
-                        Files.createDirectories(nuevoArchivo.getParent());
-                        try (FileOutputStream fos = new FileOutputStream(nuevoArchivo.toFile())) {
-                            int len;
-                            while ((len = zis.read(buffer)) > 0) fos.write(buffer, 0, len);
-                        }
-                    }
-                    zis.closeEntry();
-                }
-            }
+            descomprimirZip(inputEpub, tempExtractDir);
 
             estados.put(id, "Comprimiendo carpeta para descarga...");
             empaquetarEnZipEstandar(tempExtractDir, outputZipResult);
@@ -49,17 +33,25 @@ public class ZipArchiveProcessor {
     public void reempaquetarComoEpub(String id, Path carpetaFuente, Path epubSalida, Map<String, String> estados) {
         try {
             estados.put(id, "Validando estructura EPUB...");
+            
             Path rutaMimetype = carpetaFuente.resolve("mimetype");
             if (!Files.exists(rutaMimetype)) {
-                estados.put(id, "ERROR: Falta el archivo 'mimetype'.");
-                return;
+                try (Stream<Path> s = Files.list(carpetaFuente)) {
+                    Path posibleSub = s.filter(Files::isDirectory).findFirst().orElse(null);
+                    if (posibleSub != null && Files.exists(posibleSub.resolve("mimetype"))) {
+                        carpetaFuente = posibleSub;
+                        rutaMimetype = carpetaFuente.resolve("mimetype");
+                    } else {
+                        estados.put(id, "ERROR: Falta el archivo 'mimetype'.");
+                        return;
+                    }
+                }
             }
 
             estados.put(id, "Re-empaquetando EPUB (Reglas estrictas)...");
             try (FileOutputStream fos = new FileOutputStream(epubSalida.toFile());
                  ZipOutputStream zos = new ZipOutputStream(fos)) {
                 
-                // 1. Mimetype SIN COMPRIMIR
                 byte[] mimetypeBytes = Files.readAllBytes(rutaMimetype);
                 ZipEntry mimetypeEntry = new ZipEntry("mimetype");
                 mimetypeEntry.setMethod(ZipEntry.STORED);
@@ -72,20 +64,21 @@ public class ZipArchiveProcessor {
                 zos.write(mimetypeBytes);
                 zos.closeEntry();
 
-                // 2. Resto de archivos DEFLATED
-                try (Stream<Path> paths = Files.walk(carpetaFuente)) {
+                final Path carpetaBase = carpetaFuente;
+                try (Stream<Path> paths = Files.walk(carpetaBase)) {
                     paths.filter(Files::isRegularFile)
                          .filter(path -> !path.getFileName().toString().equals("mimetype"))
                          .forEach(path -> {
                              try {
-                                 String zipPath = carpetaFuente.relativize(path).toString().replace(File.separator, "/");
+                                 String zipPath = carpetaBase.relativize(path).toString().replace(File.separator, "/");
+                                 
                                  ZipEntry entry = new ZipEntry(zipPath);
                                  entry.setMethod(ZipEntry.DEFLATED);
                                  zos.putNextEntry(entry);
                                  Files.copy(path, zos);
                                  zos.closeEntry();
                              } catch (IOException e) {
-                                 // ignorar o loguear
+                                 System.err.println("Error al añadir archivo: " + e.getMessage());
                              }
                          });
                 }
@@ -102,10 +95,9 @@ public class ZipArchiveProcessor {
                  .filter(Files::isRegularFile)
                  .forEach(path -> {
                      try {
+                         String rutaLimpia = carpetaFuente.relativize(path).toString().replace("\\", "/");
 
-                        String rutaLimpia = carpetaFuente.relativize(path).toString().replace("\\", "/");
-
-                         ZipEntry zipEntry = new ZipEntry(carpetaFuente.relativize(path).toString());
+                         ZipEntry zipEntry = new ZipEntry(rutaLimpia);
                          zos.putNextEntry(zipEntry);
                          Files.copy(path, zos);
                          zos.closeEntry();
@@ -113,6 +105,31 @@ public class ZipArchiveProcessor {
                         System.err.println("Error comprimiendo: " + e.getMessage());
                      }
                  });
+        }
+    }
+
+    public void descomprimirZip(Path archivoZip, Path carpetaDestino) throws IOException {
+        try (ZipInputStream zis = new ZipInputStream(new BufferedInputStream(new FileInputStream(archivoZip.toFile())))) {
+            ZipEntry zipEntry;
+            byte[] buffer = new byte[1024];
+            while ((zipEntry = zis.getNextEntry()) != null) {
+                Path nuevoArchivo = carpetaDestino.resolve(zipEntry.getName());
+                
+                if (!nuevoArchivo.normalize().startsWith(carpetaDestino.normalize())) {
+                    continue; 
+                }
+
+                if (zipEntry.isDirectory()) {
+                    Files.createDirectories(nuevoArchivo);
+                } else {
+                    Files.createDirectories(nuevoArchivo.getParent());
+                    try (FileOutputStream fos = new FileOutputStream(nuevoArchivo.toFile())) {
+                        int len;
+                        while ((len = zis.read(buffer)) > 0) fos.write(buffer, 0, len);
+                    }
+                }
+                zis.closeEntry();
+            }
         }
     }
 }

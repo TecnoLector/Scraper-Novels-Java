@@ -89,34 +89,21 @@ public class EpubService {
                         break;
 
                     case "REEMPAQUETAR":
-                        estados.put(id, "Preparando estructura de carpetas...");
-
+                        estados.put(id, "Procesando archivo contenedor...");
                         Path carpetaFuente = storage.crearCarpetaTemporal("repack_");
 
-                        if (folderFiles != null) {
-                            for (MultipartFile file : folderFiles) {
-                                String rutaRelativa = file.getOriginalFilename();
-
-                                if (rutaRelativa != null && rutaRelativa.contains("/")) {
-                                    rutaRelativa = rutaRelativa.substring(rutaRelativa.indexOf("/") + 1);
-                                }
-
-                                Path destinoArchivo = carpetaFuente.resolve(rutaRelativa);
-
-                                Files.createDirectories(destinoArchivo.getParent());
-                                file.transferTo(destinoArchivo.toFile());
-                            }
-                        }
+                        zipProcessor.descomprimirZip(input, carpetaFuente);
 
                         String homeUsuario = System.getProperty("user.home");
                         Path rutaDescargas = Paths.get(homeUsuario, "Downloads");
-                        String nombreEpub = carpetaFuente.getFileName().toString() + "_final.epub";
-                        Path epubSalida = rutaDescargas.resolve(nombreEpub);
+
+                        String nombreBase = nombre.contains(".") ? nombre.substring(0, nombre.lastIndexOf('.'))
+                                : nombre;
+                        Path epubSalida = rutaDescargas.resolve(nombreBase + "_reempaquetado.epub");
 
                         zipProcessor.reempaquetarComoEpub(id, carpetaFuente, epubSalida, estados);
 
                         eliminarCarpetaRecursiva(carpetaFuente);
-
                         archivosListos.put(id, epubSalida);
                         break;
 
@@ -153,28 +140,31 @@ public class EpubService {
             }
         }).start();
     }
-/**
- * Elimina una carpeta y todo su contenido (archivos y subcarpetas).
- * @param ruta La ruta de la carpeta a eliminar.
- */
-private void eliminarCarpetaRecursiva(Path ruta) {
-    if (ruta == null || !Files.exists(ruta)) return;
 
-    try (Stream<Path> walk = Files.walk(ruta)) {
-        // Convertimos el stream a una lista y la invertimos
-        // Esto asegura que borramos los archivos antes que las carpetas
-        List<File> archivosABorrar = walk
-                .sorted(Comparator.reverseOrder())
-                .map(Path::toFile)
-                .collect(Collectors.toList());
+    /**
+     * Elimina una carpeta y todo su contenido (archivos y subcarpetas).
+     * 
+     * @param ruta La ruta de la carpeta a eliminar.
+     */
+    private void eliminarCarpetaRecursiva(Path ruta) {
+        if (ruta == null || !Files.exists(ruta))
+            return;
 
-        for (File archivo : archivosABorrar) {
-            if (!archivo.delete()) {
-                System.err.println("No se pudo borrar: " + archivo.getAbsolutePath());
+        try (Stream<Path> walk = Files.walk(ruta)) {
+            // Convertimos el stream a una lista y la invertimos
+            // Esto asegura que borramos los archivos antes que las carpetas
+            List<File> archivosABorrar = walk
+                    .sorted(Comparator.reverseOrder())
+                    .map(Path::toFile)
+                    .collect(Collectors.toList());
+
+            for (File archivo : archivosABorrar) {
+                if (!archivo.delete()) {
+                    System.err.println("No se pudo borrar: " + archivo.getAbsolutePath());
+                }
             }
+        } catch (IOException e) {
+            System.err.println("Error al limpiar temporales: " + e.getMessage());
         }
-    } catch (IOException e) {
-        System.err.println("Error al limpiar temporales: " + e.getMessage());
     }
-}
 }
