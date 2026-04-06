@@ -10,12 +10,14 @@ import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
+import java.io.InputStream;
 import java.time.Duration;
 import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -31,7 +33,24 @@ public class Scraper {
     private final String selectorContenidoCapitulo = "div.skn-chp-chapter-content";
 
     public Scraper() {
-        System.setProperty("webdriver.chrome.driver", "C:\\Users\\tecno\\Documents\\Novelas Sigil\\ProgramaExtracion\\mi-extractor\\chromedriver.exe");
+    
+    Properties props = new Properties();
+    try (InputStream input = getClass().getClassLoader().getResourceAsStream("application.properties")) {
+        if (input != null) {
+            props.load(input);
+        }
+    } catch (Exception e) {
+        System.err.println("Error cargando application.properties: " + e.getMessage());
+    }
+    String os = System.getProperty("os.name").toLowerCase();
+    String driverPath = "";
+
+    if (os.contains("win")) {
+        driverPath = props.getProperty("webdriver.chrome.path.windows", "drivers/chromedriver.exe");
+    } else if (os.contains("nix") || os.contains("nux") || os.contains("aix")) {
+        driverPath = props.getProperty("webdriver.chrome.path.linux", "drivers/chromedriver-linux");
+    }
+    System.setProperty("webdriver.chrome.driver", driverPath);
         ChromeOptions options = new ChromeOptions();
 
         options.setPageLoadStrategy(PageLoadStrategy.EAGER);
@@ -80,7 +99,7 @@ public class Scraper {
     public String obtenerHtmlDeIndice() {
         try {
             try {
-                String xPathContenido = "//a[contains(text(), 'Contenido')]";
+                String xPathContenido = "//button[contains(., 'Contenido')] | //a[contains(., 'Contenido')] | //span[contains(text(), 'Contenido')]";
                 WebDriverWait waitBreve = new WebDriverWait(driver, Duration.ofSeconds(3));
                 WebElement pestana = waitBreve.until(ExpectedConditions.elementToBeClickable(By.xpath(xPathContenido)));
                 

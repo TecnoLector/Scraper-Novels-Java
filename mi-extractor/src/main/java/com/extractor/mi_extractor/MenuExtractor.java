@@ -73,7 +73,8 @@ public class MenuExtractor {
         System.out.println("3. BUSCAR un capítulo por su NÚMERO.");
         System.out.println("4. Descargar un RANGO de capítulos.");
         System.out.println("5. Descargar una LISTA específica de capítulos.");
-        System.out.print("Elige una opción (1-5): ");
+        System.out.println("6. Descargar SECUENCIALMENTE (Desde link de capítulo + Límite).");
+        System.out.print("Elige una opción (1-6): ");
         int opcion;
         try {
             opcion = scanner.nextInt();
@@ -92,11 +93,15 @@ public class MenuExtractor {
                 descargarRangoDeCapitulos(scanner, rutaNovelaStr);
             } else if (opcion == 5) {
                 descargarListaEspecifica(scanner, rutaNovelaStr);
-            } else {
+            }else if (opcion == 6) { 
+                descargarSecuencialmente(scanner, rutaNovelaStr);
+            }else {
                 System.out.println("Opción no válida.");
             }
         } catch (Exception e) {
-            /* ... */ }
+            System.err.println("¡Error crítico en el menú!");
+            e.printStackTrace(); 
+        }
 
         long tiempoFin = System.currentTimeMillis();
         long tiempoTotalMillis = tiempoFin - tiempoInicio;
@@ -301,6 +306,73 @@ public class MenuExtractor {
     ejecutarDescargaParalela(capitulosParaDescargar, rutaNovelaStr, scanner);
 }
 
+private static void descargarSecuencialmente(Scanner scanner, String rutaNovelaStr) {
+        System.out.println("Introduce la URL del PRIMER CAPÍTULO a descargar:");
+        String urlActual = scanner.nextLine();
+
+        System.out.println(" ¿Cuántos capítulos deseas descargar a partir de este?");
+        System.out.println("   (Ingrese 0 si desea descargar TODO hasta que no haya botón 'Siguiente'):");
+        int limiteCapitulos = 0;
+        try {
+            limiteCapitulos = Integer.parseInt(scanner.nextLine());
+        } catch (NumberFormatException e) {
+            System.out.println("Entrada no válida. Se descargará todo por defecto.");
+        }
+
+        System.out.print("Introduce el número de capítulo con el que quieres que se guarde el primer archivo (ej. 1): ");
+        int numeroCapitulo = 1;
+        try {
+            numeroCapitulo = Integer.parseInt(scanner.nextLine());
+        } catch (NumberFormatException e) {
+            System.out.println("Se iniciará desde el capítulo 1.");
+        }
+
+        Scraper scraper = new Scraper();
+        ExtractorContenido extractor = new ExtractorContenido();
+        int capitulosDescargados = 0;
+
+        try {
+            while (urlActual != null && !urlActual.isEmpty()) {
+                System.out.println("\n>>> Navegando a: " + urlActual);
+                scraper.navegarA(urlActual);
+                String html = scraper.obtenerHtmlDePagina();
+                SitioWebConfig config = scraper.getConfig();
+
+                // Extraemos y guardamos el capítulo actual
+                Capitulo capitulo = extractor.extraer(html, config);
+                if (capitulo != null) {
+                    EscritorArchivo escritor = new EscritorArchivo();
+                    escritor.guardarCapitulo(capitulo, rutaNovelaStr, numeroCapitulo);
+                    capitulosDescargados++;
+                    System.out.println(" Capítulo " + numeroCapitulo + " guardado con éxito.");
+
+                    // Evaluamos si ya llegamos al límite establecido por el usuario
+                    if (limiteCapitulos > 0 && capitulosDescargados >= limiteCapitulos) {
+                        System.out.println("\n Límite alcanzado (" + limiteCapitulos + " capítulos). Deteniendo el scraper...");
+                        break;
+                    }
+
+                    // Preparamos para el siguiente ciclo
+                    numeroCapitulo++;
+                    
+                    // NOTA: Asegúrate de que tu ExtractorContenido tenga un método para obtener 
+                    // el link del SIGUIENTE CAPÍTULO. Si se llama diferente, ajusta la siguiente línea:
+                    urlActual = extractor.obtenerEnlaceSiguienteCapitulo(html, urlActual, config);
+                    
+                } else {
+                    System.err.println("No se pudo extraer el contenido. Abortando descarga secuencial.");
+                    break;
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Ocurrió un error en la descarga secuencial: " + e.getMessage());
+        } finally {
+            scraper.cerrar();
+            System.out.println("\n--- Descarga Secuencial Finalizada ---");
+            System.out.println("Total de capítulos descargados: " + capitulosDescargados);
+        }
+    }
+
     private static Capitulo procesarUnCapitulo(Scraper scraper, String url, String rutaDeGuardado, int numeroCapitulo)
             throws Exception {
         if (url != null)
@@ -345,7 +417,7 @@ public class MenuExtractor {
         }
 
         int totalCapitulos = capitulosParaDescargar.size();
-        int numeroHilos = 5; 
+        int numeroHilos = 1; 
         double constanteVelocidad = calcularConstanteRealista(numeroHilos);
         double tiempoTotalSegundos = (totalCapitulos * constanteVelocidad) / numeroHilos;
         long minutosEst = (long) (tiempoTotalSegundos / 60);

@@ -114,5 +114,24 @@ public class ExtractorContenido {
         }
     }
 
+    public String obtenerEnlaceSiguienteCapitulo(String html, String urlActual, SitioWebConfig config) {
+        Document doc = Jsoup.parse(html, urlActual);
+        
+        for (Element enlace : doc.select("a[href]")) {
+            String textoEnlace = enlace.text().toLowerCase().trim();
+            if (textoEnlace.contains("siguiente") || textoEnlace.contains("next") || 
+                textoEnlace.equals("sig >") || textoEnlace.equals("siguiente ->") ||
+                textoEnlace.contains("siguiente capitulo")) {
+                
+                String urlSiguiente = enlace.absUrl("href"); 
+                
+                if (!urlSiguiente.isEmpty() && !urlSiguiente.equals(urlActual) && !urlSiguiente.contains("#")) {
+                    return urlSiguiente;
+                }
+            }
+        }
+        return null;
+    }
+
     
 }
