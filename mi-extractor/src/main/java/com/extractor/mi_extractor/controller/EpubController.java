@@ -24,30 +24,31 @@ public class EpubController {
 
     private final EpubService epubService;
 
-    public EpubController(EpubService epubService){
+    public EpubController(EpubService epubService) {
         this.epubService = epubService;
     }
 
     @PostMapping("/upload")
     public String upload(
-        @RequestParam("file") MultipartFile file,
-        @RequestParam(value = "files", required = false) MultipartFile[] folderFiles,
-        @RequestParam("accion") String accion,
-        @RequestParam(value = "tipoDivision", required = false) Integer tipoDivision,
-        @RequestParam(value = "parametro", required = false) Integer parametro,
-        @RequestParam(value = "sitio", required = false) String sitio,
-        @RequestParam(value = "creador", required = false) String creador,
-        @RequestParam(value = "nombresPaginas", required = false) List<String> nombresPaginas,
-        @RequestParam(value = "capitulosAnteriores", required = false) List<Integer> capitulosAnteriores)throws Exception {
-    
-    String id = UUID.randomUUID().toString();
-    
-    // Le pasamos todo al servicio
-    epubService.iniciarProceso(id, file.getBytes(), file.getOriginalFilename(), accion, tipoDivision,
-     parametro, sitio, creador, nombresPaginas, capitulosAnteriores, folderFiles);
-    
-    return id;
-}
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "files", required = false) MultipartFile[] folderFiles,
+            @RequestParam("accion") String accion,
+            @RequestParam(value = "tipoDivision", required = false) Integer tipoDivision,
+            @RequestParam(value = "parametro", required = false) Integer parametro,
+            @RequestParam(value = "sitio", required = false) String sitio,
+            @RequestParam(value = "creador", required = false) String creador,
+            @RequestParam(value = "nombresPaginas", required = false) List<String> nombresPaginas,
+            @RequestParam(value = "capitulosAnteriores", required = false) List<Integer> capitulosAnteriores)
+            throws Exception {
+
+        String id = UUID.randomUUID().toString();
+
+        // Le pasamos todo al servicio
+        epubService.iniciarProceso(id, file.getBytes(), file.getOriginalFilename(), accion, tipoDivision,
+                parametro, sitio, creador, nombresPaginas, capitulosAnteriores, folderFiles);
+
+        return id;
+    }
 
     @GetMapping("/status/{id}")
     public String checkStatus(@PathVariable String id) {
@@ -57,16 +58,35 @@ public class EpubController {
     @GetMapping("/download/{id}")
     public ResponseEntity<Resource> download(@PathVariable String id) throws Exception {
         Path path = epubService.getRutaFinal(id);
-        
+
         if (path == null) {
             return ResponseEntity.notFound().build();
         }
 
         Resource resource = new UrlResource(path.toUri());
-        
+
         return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType("application/zip")) 
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + path.getFileName().toString() + "\"")
+                .contentType(MediaType.parseMediaType("application/zip"))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + path.getFileName().toString() + "\"")
                 .body(resource);
+    }
+
+    @PostMapping("/scrape")
+    public String iniciarExtraccion(
+            @RequestParam("url") String url,
+            @RequestParam("opcion") Integer opcion, // Viene del select 'tipoExtraccion'
+            @RequestParam(value = "hilos", defaultValue = "3") Integer hilos,
+            @RequestParam(value = "limite", defaultValue = "0") Integer limite,
+            @RequestParam(value = "inicio", defaultValue = "0") Integer inicio,
+            @RequestParam(value = "fin", defaultValue = "0") Integer fin,
+            @RequestParam(value = "lista", defaultValue = "") String lista) {
+
+        String id = UUID.randomUUID().toString();
+
+        // Llamamos al servicio pasando TODO
+        epubService.iniciarExtraccionWeb(id, url, opcion, hilos, limite, inicio, fin, lista);
+
+        return id;
     }
 }

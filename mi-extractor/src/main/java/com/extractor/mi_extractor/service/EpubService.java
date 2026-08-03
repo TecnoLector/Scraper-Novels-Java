@@ -1,18 +1,14 @@
 package com.extractor.mi_extractor.service;
 
+import com.extractor.mi_extractor.MenuExtractor;
 import com.extractor.mi_extractor.processor.CalibreProcessor;
 import com.extractor.mi_extractor.processor.InsertPageBookProcessor;
 import com.extractor.mi_extractor.processor.ZipArchiveProcessor;
 import com.extractor.mi_extractor.processor.SplitProcessor;
-import com.extractor.mi_extractor.processor.InsertPageBookProcessor;
 
-import com.extractor.mi_extractor.service.StorageService;
-
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -21,13 +17,10 @@ import java.nio.file.Paths;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import java.nio.file.Path;
 
 @Service
 public class EpubService {
@@ -67,7 +60,6 @@ public class EpubService {
                 storage.guardarArchivo(input, bytes);
 
                 switch (accion) {
-
                     case "DIVIDIR":
                         Path outputSplit = dir.resolve(nombre.replace(".epub", "_dividido.zip"));
                         int tipoDiv = (tipoDivision != null) ? tipoDivision : 1;
@@ -141,18 +133,11 @@ public class EpubService {
         }).start();
     }
 
-    /**
-     * Elimina una carpeta y todo su contenido (archivos y subcarpetas).
-     * 
-     * @param ruta La ruta de la carpeta a eliminar.
-     */
     private void eliminarCarpetaRecursiva(Path ruta) {
         if (ruta == null || !Files.exists(ruta))
             return;
 
         try (Stream<Path> walk = Files.walk(ruta)) {
-            // Convertimos el stream a una lista y la invertimos
-            // Esto asegura que borramos los archivos antes que las carpetas
             List<File> archivosABorrar = walk
                     .sorted(Comparator.reverseOrder())
                     .map(Path::toFile)
@@ -166,5 +151,43 @@ public class EpubService {
         } catch (IOException e) {
             System.err.println("Error al limpiar temporales: " + e.getMessage());
         }
+    }
+
+    public void iniciarExtraccionWeb(String id, String url, Integer opcion, Integer hilos, Integer limite, Integer inicio, Integer fin, String lista) {
+        estados.put(id, "5% - Inicializando motor multihilo...");
+        
+        CompletableFuture.runAsync(() -> {
+            try {
+                Path rutaTemp = storage.crearCarpetaTemporal("extraccion_");
+                MenuExtractor extractor = new MenuExtractor();
+                
+                Path carpetaResultante = extractor.descargarWebMultiHilo(
+                    opcion, 
+                    url,
+                    hilos,
+                    limite,
+                    inicio,
+                    fin,
+                    lista,
+                    rutaTemp.toString(),
+                    (mensaje) -> {  
+                        estados.put(id, mensaje);
+                    }
+                );
+                
+                if (carpetaResultante != null) {
+                    estados.put(id, "98% - Comprimiendo resultado...");
+                    
+                    Path zipFinal = storage.crearCarpetaTemporal("final_").resolve("Novela_" + id.substring(0,5) + ".zip");
+                    zipProcessor.empaquetarEnZipEstandar(carpetaResultante, zipFinal);
+                    
+                    archivosListos.put(id, zipFinal);
+                    estados.put(id, "LISTO");
+                }
+            } catch (Exception e) {
+                estados.put(id, "ERROR: " + e.getMessage());
+                e.printStackTrace();
+            }
+        });
     }
 }

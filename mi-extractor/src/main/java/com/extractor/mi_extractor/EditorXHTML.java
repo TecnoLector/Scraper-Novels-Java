@@ -354,75 +354,69 @@ public class EditorXHTML {
     }
 
     private void estandarizarTitulosXHTML() {
-        // --- Patrones de Búsqueda ---
-        // Patrón 1: "Capítulo 123: Nombre"
-        Pattern patronConPalabra = Pattern.compile(".*Cap[ií]tulo\\s*(\\d+)[\\s:–—.-]?\\s*(.*)",
-                Pattern.CASE_INSENSITIVE);
-        // Patrón 2: "123: Nombre" (con separador)
-        Pattern patronSinPalabraSep = Pattern.compile("^(\\d+)[\\s:–—.-]+\\s*([^<]+.*)");
-        // Patrón 3: "123 Nombre" (como tu ejemplo: 1013 Crecimiento Individual)
-        Pattern patronSinPalabraSimple = Pattern.compile("^(\\d+)\\s+([^<]+.*)");
         String[] selectoresCandidatos = {
                 "h1", "h2", "h3", "h4", "p > strong", "p", "b"
         };
-
         Map<File, PropuestaCambio> cambiosPropuestos = new LinkedHashMap<>();
 
-        System.out.println("Analizando títulos (con promoción a h1)...");
+        System.out.println("Analizando títulos (basado en nombres de archivo para mayor precisión)...");
+        
+        // Patrón para extraer el número base y la sub-parte del nombre del archivo (ej. Capitulo0003_01.xhtml)
+        Pattern patronArchivo = Pattern.compile("Capitulo(\\d+)(?:_(\\d+))?\\.xhtml", Pattern.CASE_INSENSITIVE);
+        // Patrón para limpiar "Capítulo 3:" o números sueltos al inicio del título original
+        Pattern patronLimpiar = Pattern.compile("^(?:Cap[ií]tulo\\s+\\d+|\\d+(?![a-z]))[\\s:–—.-]*\\s*(.*)", Pattern.CASE_INSENSITIVE);
+
         for (File archivo : archivosXHTML) {
             try {
                 String contenido = Files.readString(archivo.toPath(), StandardCharsets.UTF_8);
                 Document doc = Jsoup.parse(contenido);
                 Element tituloElement = null;
-                String selectorEncontrado = null;
 
                 for (String selector : selectoresCandidatos) {
                     tituloElement = doc.selectFirst(selector);
                     if (tituloElement != null) {
-                        selectorEncontrado = selector;
                         break;
                     }
                 }
 
                 if (tituloElement == null) {
-                    System.err.println(
-                            "Advertencia: No se encontró <h1>, <h2>, <h3> o <p><strong> en " + archivo.getName());
+                    System.err.println("Advertencia: No se encontró etiqueta de título en " + archivo.getName());
                     continue;
                 }
 
                 String tituloOriginal = tituloElement.text().trim().replace("\uFFFD", "’");
-                Matcher m1 = patronConPalabra.matcher(tituloOriginal);
-                Matcher m2 = patronSinPalabraSep.matcher(tituloOriginal);
-                Matcher m3 = patronSinPalabraSimple.matcher(tituloOriginal);
+                
+                // 1. Extraer el número y parte directamente del nombre del archivo
+                Matcher mArch = patronArchivo.matcher(archivo.getName());
+                if (mArch.matches()) {
+                    int capNum = Integer.parseInt(mArch.group(1));
+                    String prefijo = "Capítulo " + capNum;
+                    
+                    // 2. Si el archivo tiene decimales (ej. _01), formateamos agregando "- Parte X"
+                    if (mArch.group(2) != null) {
+                        int subNum = Integer.parseInt(mArch.group(2));
+                        prefijo += " - Parte " + subNum;
+                    }
 
-                String numero = null;
-                String nombre = null;
+                    // 3. Limpiamos basuras del título original
+                    String nombreLimpio = tituloOriginal;
+                    Matcher mLimpiar = patronLimpiar.matcher(nombreLimpio);
+                    if (mLimpiar.matches()) {
+                        nombreLimpio = mLimpiar.group(1).trim();
+                    }
+                    if (nombreLimpio.isEmpty()) {
+                        nombreLimpio = "(Sin Título)";
+                    }
 
-                if (m1.matches()) { // "Capítulo 123: Nombre"
-                    numero = m1.group(1);
-                    nombre = m1.group(2).trim();
-                } else if (m2.matches()) { // "123: Nombre"
-                    numero = m2.group(1);
-                    nombre = m2.group(2).trim();
-                } else if (m3.matches()) { // "123 Nombre"
-                    numero = m3.group(1);
-                    nombre = m3.group(2).trim();
-                }
-
-                if (numero != null && nombre != null) {
-                    if (nombre.isEmpty())
-                        nombre = "(Título no encontrado)";
-                    String tituloNuevo = "Capítulo " + numero + ": " + nombre;
+                    // 4. Título final exacto para coincidir <h1> y <title> (Estandarización)
+                    String tituloNuevo = prefijo + ": " + nombreLimpio;
 
                     boolean debePromover = !tituloElement.tagName().equals("h1");
                     if (!tituloOriginal.equals(tituloNuevo) || debePromover) {
-                        String cssSelector = tituloElement.cssSelector();
-                        cambiosPropuestos.put(archivo,
-                                new PropuestaCambio(cssSelector, tituloOriginal, tituloNuevo, debePromover));
+                        cambiosPropuestos.put(archivo, new PropuestaCambio(tituloElement.cssSelector(), tituloOriginal, tituloNuevo, debePromover));
                     }
                 } else {
-                    System.out.println(
-                            "Info: Título no reconocido en " + archivo.getName() + ": \"" + tituloOriginal + "\"");
+                    System.out.println("Info: Archivo no estándar ignorado (" + archivo.getName() + ")");
                 }
 
             } catch (IOException e) {
@@ -1106,7 +1100,8 @@ public class EditorXHTML {
         Pattern patronHr = Pattern.compile("(?i)<hr[^>]*/?>");
         Pattern patronImg = Pattern.compile("(?i)<img(?:\"[^\"]*\"|'[^']*'|[^'\">])*?(?<!/)\\s*>");
         Pattern patronMark = Pattern.compile("(?i)<markdown[^>]+(?<!/)>");
-        Pattern patronBr = Pattern.compile("(?i)<br>(?!</br>|</br>|\\s*/>)");
+        Pattern patronBr = Pattern.compile("(?i)<br\\s*(?!/)[^>]*>");
+        Pattern patronWord = Pattern.compile("(?i)</?o:p[^>]*>");
 
         // --- FASE 1: DIAGNÓSTICO ---
         for (File archivo : archivosXHTML) {
@@ -1153,6 +1148,10 @@ public class EditorXHTML {
                     erroresEncontrados.add("Etiqueta <br> no auto-cerrada");
                     problemaDetectadoEsteArchivo = true;
                 }
+                if (patronWord.matcher(contenido).find()) {
+                    erroresEncontrados.add("Contiene etiquetas basura de Microsoft Word (<o:p>)");
+                    problemaDetectadoEsteArchivo = true;
+                }
 
                 // --- Añadir al mapa SI se detectó algún problema ---
                 if (problemaDetectadoEsteArchivo) {
@@ -1196,7 +1195,7 @@ public class EditorXHTML {
                             if (!contenido.trim().startsWith("<?xml")) {
                                 contenido = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" + contenido;
                             }
-                            contenido = contenido.replace("&nbsp;", "&#160;");
+                            contenido = contenido.replaceAll("&(?![A-Za-z0-9#]+;)", "&amp;");
                             contenido = contenido.replaceAll("(?i)(<link[^>]+)(?<!/)>", "$1 />");
                             contenido = contenido.replaceAll("(?i)<hr[^>]*/?>", "");
                             contenido = contenido.replaceAll("(?i)(<img(?:\"[^\"]*\"|'[^']*'|[^'\">])*?)(\\s*)(?<!/)>",
@@ -1204,7 +1203,9 @@ public class EditorXHTML {
                             contenido = contenido.replaceAll("(?i)<markdown[^>]*>", "");
                             contenido = contenido.replaceAll("(?i)</markdown>", "");
                             contenido = contenido.replaceAll("(?i)<markdown[^>]*/>", "");
-                            contenido = contenido.replaceAll("(?i)<br>", "<br />");
+                            contenido = contenido.replaceAll("(?i)<br\\s*[^>]*>", "<br />");
+                            contenido = contenido.replaceAll("(?i)<o:p[^>]*>", "");
+                            contenido = contenido.replaceAll("(?i)</o:p>", "");
 
                         }
                         if (!contenido.equals(contenidoOriginal) && reporteProblemas.get(archivo).stream()

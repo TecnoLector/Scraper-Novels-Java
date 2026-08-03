@@ -8,7 +8,7 @@ try {
     const savedTheme = localStorage.getItem('theme') || 'light';
     setTheme(savedTheme);
 } catch (e) {
-    setTheme('light'); 
+    setTheme('light');
 }
 
 themeToggle.addEventListener('click', () => {
@@ -21,7 +21,7 @@ function setTheme(theme) {
     root.setAttribute('data-theme', theme);
     try {
         localStorage.setItem('theme', theme);
-    } catch(e) {}
+    } catch (e) { }
     themeToggle.textContent = theme === 'dark' ? '☀️' : '🌙';
 }
 
@@ -74,7 +74,7 @@ function eliminarFila(boton) {
     boton.parentElement.remove();
 }
 // Inicializamos la vista al cargar la página
-window.onload = function() {
+window.onload = function () {
     agregarFilaPagina();
     actualizarFormulario();
 };
@@ -96,24 +96,24 @@ async function comenzarProceso() {
     pContainer.style.display = 'block';
     pBar.style.width = '0%';
     pBar.className = 'progress-bar';
-    
+
     const formData = new FormData();
     formData.append("accion", accion);
 
     if (accion === 'REEMPAQUETAR') {
         if (fileInput.files.length > 1) {
             statusTxt.innerHTML = '📦 <span style="color: var(--primary-color)">Comprimiendo carpeta en el navegador...</span>';
-            
+
             try {
                 const zip = new JSZip();
                 for (let file of fileInput.files) {
                     zip.file(file.webkitRelativePath || file.name, file);
                 }
 
-                const content = await zip.generateAsync({type: "blob"});
-                
+                const content = await zip.generateAsync({ type: "blob" });
+
                 formData.append("file", content, "carpeta_comprimida.zip");
-                
+
             } catch (err) {
                 statusTxt.innerHTML = '❌ Error al comprimir: ' + err.message;
                 return;
@@ -143,6 +143,7 @@ async function comenzarProceso() {
             }
         }
     }
+
 
     // --- ENVÍO AL SERVIDOR ---
     statusTxt.innerHTML = '⏳ <span style="color: var(--text-muted)">Subiendo archivo al servidor...</span>';
@@ -178,30 +179,66 @@ function consultarServidor(id) {
         try {
             const res = await fetch('/api/epub/status/' + id);
             const msg = await res.text();
+            const msgTrimmed = msg.trim(); // Limpiamos espacios en blanco
+
+            // 1. Intentamos detectar si es el JSON de MULTIHILO
+            if (msgTrimmed.startsWith("{")) {
+                try {
+                    const data = JSON.parse(msgTrimmed);
+                    if (data.tipo === "MULTIHILO") {
+                        // Actualizamos la barra global
+                        pBar.style.width = data.globalPct + '%';
+                        pBar.textContent = data.globalPct + '%';
+                        statusTxt.innerHTML = `⚙️ <span style="color:var(--primary-color)">Extrayendo con ${data.hilos.length} hilos...</span>`;
+
+                        // Dibujamos las mini-barras en el contenedor
+                        const container = document.getElementById('hilosContainer');
+                        container.style.display = 'block';
+                        container.innerHTML = ''; // Limpiamos para redibujar
+
+                        data.hilos.forEach(hilo => {
+                            container.innerHTML += `
+                    <div style="margin-bottom: 10px;">
+                        <div style="display:flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 2px;">
+                            <strong>Hilo ${hilo.id}</strong> <span>${hilo.msg}</span>
+                        </div>
+                        <div class="progress-container" style="display:block; height:8px; background: var(--border-color);">
+                            <div class="progress-bar" style="width: ${hilo.pct}%; background-color: var(--secondary-color); transition: width 0.3s;"></div>
+                        </div>
+                    </div>
+                `;
+                        });
+
+                        return; // ¡IMPORTANTE! Cortamos aquí para que NO se ejecute la línea de abajo
+                    }
+                } catch (e) {
+                    console.error("Error parseando JSON de hilos:", e);
+                }
+            }
             const mensajeLimpio = msg.trim().toUpperCase();
-            
+
             if (mensajeLimpio.includes("LISTO")) {
                 clearInterval(interval);
                 pBar.style.width = '100%';
                 pBar.classList.add('success');
                 pBar.textContent = '¡Completado!';
                 statusTxt.innerHTML = "✅ <strong>¡Proceso terminado!</strong> <br> <a href='/api/epub/download/" + id + "' class='download-link'>Descargar archivo final</a>";
-                window.location.href = '/api/epub/download/' + id; 
-            } 
+                window.location.href = '/api/epub/download/' + id;
+            }
             else if (msg.startsWith("ERROR")) {
                 clearInterval(interval);
                 pBar.style.width = '100%';
                 pBar.classList.add('error');
                 pBar.textContent = 'Error';
                 statusTxt.innerHTML = '<span style="color: var(--error-color)">❌ ' + msg + '</span>';
-            } 
+            }
             else {
                 statusTxt.innerHTML = "⚙️ " + msg;
                 const match = msg.match(/(\d+)%/);
                 if (match) {
                     progress = parseInt(match[1]);
                 } else if (progress < 90) {
-                     progress += 2; 
+                    progress += 2;
                 }
                 pBar.style.width = progress + '%';
                 pBar.textContent = progress > 10 ? progress + '%' : '';
@@ -210,4 +247,70 @@ function consultarServidor(id) {
             console.error("Error consultando estado", e);
         }
     }, 800);
+}
+
+// --- 4. LÓGICA DE PESTAÑAS (TABS) ---
+function cambiarModulo(idModulo, botonPresionado) {
+    const modulos = document.querySelectorAll('.modulo-seccion');
+    modulos.forEach(modulo => modulo.style.display = 'none');
+
+    const botones = document.querySelectorAll('.tab-btn');
+    botones.forEach(btn => btn.classList.remove('active'));
+
+    document.getElementById(idModulo).style.display = 'block';
+    botonPresionado.classList.add('active');
+
+    document.getElementById('pContainer').style.display = 'none';
+    document.getElementById('statusTxt').innerHTML = '';
+}
+
+// --- 5. LÓGICA DE EXTRACCIÓN WEB ---
+function actualizarInterfazExtraccion() {
+    const opcion = document.getElementById('tipoExtraccion').value;
+    const labelUrl = document.getElementById('labelUrl');
+
+    // Control de visibilidad de campos
+    document.getElementById('campoRango').style.display = (opcion === "4") ? "flex" : "none";
+    document.getElementById('campoLista').style.display = (opcion === "5") ? "block" : "none";
+    document.getElementById('campoLimite').style.display = (opcion === "2" || opcion === "6") ? "block" : "none";
+
+    // Ajuste de etiquetas
+    if (opcion === "6") {
+        labelUrl.innerText = "URL del PRIMER capítulo:";
+        document.getElementById('labelLimite').innerText = "Límite de capítulos (0 = todo):";
+    } else {
+        labelUrl.innerText = "URL de la Portada:";
+        document.getElementById('labelLimite').innerText = "Descargar hasta el capítulo #:";
+    }
+}
+
+async function iniciarExtraccion() {
+    const urlInput = document.getElementById('inputUrlScrap').value.trim();
+    if (!urlInput) { alert("Ingresa una URL válida"); return; }
+
+    const statusTxt = document.getElementById('statusTxt');
+    const pBar = document.getElementById('pBar');
+    const pContainer = document.getElementById('pContainer');
+
+    pContainer.style.display = 'block';
+    pBar.className = 'progress-bar';
+    statusTxt.innerHTML = '⏳ Conectando con Selenium...';
+
+    const formData = new FormData();
+    // Capturamos TODO el formulario
+    formData.append("opcion", document.getElementById('tipoExtraccion').value);
+    formData.append("url", urlInput);
+    formData.append("hilos", document.getElementById('inputHilos').value || 3);
+    formData.append("limite", document.getElementById('inputLimiteCap').value || 0);
+    formData.append("inicio", document.getElementById('inputInicio').value || 0);
+    formData.append("fin", document.getElementById('inputFin').value || 0);
+    formData.append("lista", document.getElementById('inputLista').value || "");
+
+    try {
+        const response = await fetch('/api/epub/scrape', { method: 'POST', body: formData });
+        if (response.ok) {
+            const id = await response.text();
+            consultarServidor(id);
+        }
+    } catch (error) { statusTxt.innerHTML = '❌ Error de conexión'; }
 }

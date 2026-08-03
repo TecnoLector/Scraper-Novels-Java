@@ -7,11 +7,19 @@ import java.nio.file.Paths;
 
 public class EscritorArchivo {
 
-    public void guardarCapitulo(Capitulo capitulo, String rutaDeGuardadoBase, int numeroCapitulo) throws IOException {
+    public void guardarCapitulo(Capitulo capitulo, String rutaDeGuardadoBase, double numeroCapitulo) throws IOException {
         String titulo = capitulo.getTitulo();
         String contenidoHtml = capitulo.getContenidoHtml();
 
-        String nombreArchivo = String.format("Capitulo%04d.xhtml", numeroCapitulo);
+        String nombreArchivo;
+        if (numeroCapitulo % 1 == 0) {
+            nombreArchivo = String.format("Capitulo%04d.xhtml", (int) numeroCapitulo);
+        } else {
+            String[] partes = String.valueOf(numeroCapitulo).split("\\.");
+            int entero = Integer.parseInt(partes[0]);
+            String decimal = partes[1];
+            nombreArchivo = String.format("Capitulo%04d_%s.xhtml", entero, decimal);
+        }
         
         // --- CAMBIO: Guardar dentro de OEBPS/Text ---
         Path rutaCompleta = Paths.get(rutaDeGuardadoBase, "OEBPS", "Text", nombreArchivo);
@@ -25,13 +33,13 @@ public class EscritorArchivo {
         System.out.println(" ¡Éxito! Guardado como: " + rutaCompleta.toString());
     }
 
-    // --- PLANTILLA XHTML CORRECTA (EPUB 2 / XHTML 1.1) ---
+    // --- PLANTILLA XHTML PARA EPUB 3 (HTML5) ---
     private String construirPlantillaXHTML(String titulo, String contenidoHtml) {
         return "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
-             + "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.1//EN\"\n"
-             + "  \"http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd\">\n"
-             + "<html xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"es\">\n"
+             + "<!DOCTYPE html>\n"
+             + "<html xmlns=\"http://www.w3.org/1999/xhtml\" xmlns:epub=\"http://www.idpf.org/2007/ops\" xml:lang=\"es\" lang=\"es\">\n"
              + "<head>\n"
+             + "  <meta charset=\"utf-8\" />\n"
              + "  <title>" + titulo + "</title>\n"
              + "  <link rel=\"stylesheet\" type=\"text/css\" href=\"../Styles/stylesheet.css\" />\n"
              + "</head>\n"

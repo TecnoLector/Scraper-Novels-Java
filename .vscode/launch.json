@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Spring Boot-App<mi-extractor>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "com.extractor.mi_extractor.App",
+            "projectName": "mi-extractor",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}
