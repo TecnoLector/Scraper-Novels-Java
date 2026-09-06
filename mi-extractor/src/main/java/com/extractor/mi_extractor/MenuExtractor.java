@@ -309,6 +309,7 @@ public class MenuExtractor {
 
         ejecutarDescargaParalela(capitulosParaDescargar, rutaNovelaStr, scanner);
     }
+    
     private static void descargarSecuencialmente(Scanner scanner, String rutaNovelaStr) {
         System.out.println("Introduce la URL del PRIMER CAPÍTULO a descargar:");
         String urlActual = scanner.nextLine();
@@ -322,8 +323,7 @@ public class MenuExtractor {
             System.out.println("Entrada no válida. Se descargará todo por defecto.");
         }
 
-        System.out
-                .print("Introduce el número de capítulo con el que quieres que se guarde el primer archivo (ej. 1): ");
+        System.out.print("Introduce el número de capítulo con el que quieres que se guarde el primer archivo (ej. 1): ");
         int numeroCapitulo = 1;
         try {
             numeroCapitulo = Integer.parseInt(scanner.nextLine());
@@ -336,9 +336,12 @@ public class MenuExtractor {
         int capitulosDescargados = 0;
 
         try {
-            while (urlActual != null && !urlActual.isEmpty()) {
-                System.out.println("\n>>> Navegando a: " + urlActual);
-                scraper.navegarA(urlActual);
+            System.out.println("\n>>> Navegando al primer capítulo: " + urlActual);
+            // 1. Navegamos SOLO UNA VEZ a la URL inicial
+            scraper.navegarA(urlActual);
+
+            // 2. Usamos un bucle infinito que se romperá cuando ya no haya botón de 'Siguiente'
+            while (true) {
                 String html = scraper.obtenerHtmlDePagina();
                 SitioWebConfig config = scraper.getConfig();
 
@@ -352,18 +355,21 @@ public class MenuExtractor {
 
                     // Evaluamos si ya llegamos al límite establecido por el usuario
                     if (limiteCapitulos > 0 && capitulosDescargados >= limiteCapitulos) {
-                        System.out.println(
-                                "\n Límite alcanzado (" + limiteCapitulos + " capítulos). Deteniendo el scraper...");
+                        System.out.println("\n Límite alcanzado (" + limiteCapitulos + " capítulos). Deteniendo el scraper...");
                         break;
                     }
 
-                    // Preparamos para el siguiente ciclo
                     numeroCapitulo++;
 
-                    // NOTA: Asegúrate de que tu ExtractorContenido tenga un método para obtener
-                    // el link del SIGUIENTE CAPÍTULO. Si se llama diferente, ajusta la siguiente
-                    // línea:
-                    urlActual = extractor.obtenerEnlaceSiguienteCapitulo(html, urlActual, config);
+                    // 3. LA MAGIA: Le decimos a Selenium que busque el botón y haga clic
+                    System.out.println("   Buscando el siguiente capítulo...");
+                    boolean haySiguiente = scraper.irAlSiguienteCapitulo();
+
+                    // Si Selenium no encuentra botón, rompemos el bucle porque llegamos al final
+                    if (!haySiguiente) {
+                        System.out.println("\n Fin de la novela alcanzado o no hay más capítulos publicados.");
+                        break;
+                    }
 
                 } else {
                     System.err.println("No se pudo extraer el contenido. Abortando descarga secuencial.");

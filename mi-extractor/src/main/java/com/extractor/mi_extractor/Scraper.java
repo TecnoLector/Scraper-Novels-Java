@@ -412,34 +412,62 @@ public class Scraper {
     }
 
     public boolean irAlSiguienteCapitulo() {
-
         try {
-            wait.until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector(selectorContenidoCapitulo)));
-            return true;
+            String urlActual = driver.getCurrentUrl();
+
+            // 1. Selector Universal: Busca enlaces o botones que digan "siguiente", "next" o tengan esas clases
+            String xpathSiguiente = "//a[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚ', 'abcdefghijklmnopqrstuvwxyzáéíóú'), 'siguiente')] " +
+                                    "| //button[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚ', 'abcdefghijklmnopqrstuvwxyzáéíóú'), 'siguiente')] " +
+                                    "| //a[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'next')] " +
+                                    "| //*[contains(@class, 'btn-next') or contains(@class, 'next-chap')]";
+            
+            java.util.List<WebElement> botones = driver.findElements(By.xpath(xpathSiguiente));
+            WebElement botonClick = null;
+            
+            for (WebElement btn : botones) {
+                // Filtramos botones ocultos o que estén desactivados (común en el último capítulo de la novela)
+                if (btn.isDisplayed() && btn.getAttribute("disabled") == null && !btn.getAttribute("class").contains("disabled")) {
+                    botonClick = btn;
+                }
+            }
+
+            if (botonClick != null) {
+                System.out.println("   -> Botón 'Siguiente' detectado. Avanzando...");
+                
+                String href = botonClick.getAttribute("href");
+                
+                // 2. Navegación Inteligente
+                if (href != null && !href.isEmpty() && !href.trim().equals("#") && !href.contains("javascript")) {
+    
+                    driver.get(href);
+                } else {
+                    js.executeScript("arguments[0].click();", botonClick);
+                }
+
+                // 3. Esperamos el cambio (Angular no recarga la página, solo cambia la URL internamente)
+                try {
+                    WebDriverWait waitCorto = new WebDriverWait(driver, Duration.ofSeconds(5));
+                    waitCorto.until(ExpectedConditions.not(ExpectedConditions.urlToBe(urlActual)));
+                } catch (Exception e) {
+                    // Si la URL no cambia a tiempo, asumimos que Angular está cargando el texto
+                }
+
+                // 4. Verificamos que el nuevo contenido ya esté visible en pantalla
+                String selectorContenido = configActual.getSelectorContenido();
+                wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(selectorContenido)));
+                
+                Thread.sleep(1200); // Pausa de cortesía para que Angular pinte el DOM por completo
+                return true;
+                
+            } else {
+                System.out.println("   -> No se encontró botón 'Siguiente' válido. ¡Se alcanzó el final de la novela!");
+                return false;
+            }
+
         } catch (Exception e) {
-            return false; // Si falla la espera, asumimos que no cargó
+            System.out.println("   -> Error al intentar avanzar: " + e.getMessage());
+            return false;
         }
-        /*
-         * try {
-         * WebElement botonSiguiente =
-         * driver.findElement(By.xpath(xPathBotonSiguiente));
-         * js.executeScript("arguments[0].click();", botonSiguiente);
-         * System.out.println("Haciendo clic en el botón 'Siguiente'...");
-         * //
-         * System.out.println("Esperando 0.5 segundos a que cargue el nuevo capítulo..."
-         * );
-         * //Thread.sleep(2000);
-         * // System.out.
-         * println("Esperando a que cargue el contenido del SIGUIENTE capítulo...");
-         * wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(
-         * selectorContenidoCapitulo)));
-         * //System.out.println("¡Siguiente capítulo cargado!");
-         * return true;
-         * } catch (Exception e) {
-         * System.out.println("No se encontró el botón 'Siguiente'.");
-         * return false;
-         * }
-         */
     }
 
     public void cerrar() {

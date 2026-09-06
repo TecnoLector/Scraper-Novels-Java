@@ -9,7 +9,6 @@ import org.jsoup.select.Elements;
 import io.documentnode.epub4j.domain.Book;
 import io.documentnode.epub4j.domain.Resource;
 import io.documentnode.epub4j.epub.EpubWriter;
-import io.documentnode.epub4j.domain.MediaType;
 import io.documentnode.epub4j.domain.MediaTypes;
 import io.documentnode.epub4j.domain.Author;
 
