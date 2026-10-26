@@ -24,4 +24,17 @@ public class GestorSitios {
         System.out.println("⚠️ Web no reconocida. Usando configuración por defecto.");
         return new SitioSkyNovels();
     }
+
+    /** Indica si algún sitio registrado soporta la URL, sin el fallback a SkyNovels. */
+    public static boolean esUrlSoportada(String url) {
+        if (url == null) {
+            return false;
+        }
+        for (SitioWebConfig sitio : SITIOS_REGISTRADOS) {
+            if (sitio.esSoportado(url)) {
+                return true;
+            }
+        }
+        return false;
+    }
 }

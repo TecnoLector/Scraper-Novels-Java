@@ -35,18 +35,40 @@ public class EscritorArchivo {
 
     // --- PLANTILLA XHTML PARA EPUB 3 (HTML5) ---
     private String construirPlantillaXHTML(String titulo, String contenidoHtml) {
+        // El título viene del scraping: escaparlo para no romper el XHTML (&, <, >, ", ').
+        String tituloSeguro = escaparXml(titulo);
         return "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
              + "<!DOCTYPE html>\n"
              + "<html xmlns=\"http://www.w3.org/1999/xhtml\" xmlns:epub=\"http://www.idpf.org/2007/ops\" xml:lang=\"es\" lang=\"es\">\n"
              + "<head>\n"
              + "  <meta charset=\"utf-8\" />\n"
-             + "  <title>" + titulo + "</title>\n"
+             + "  <title>" + tituloSeguro + "</title>\n"
              + "  <link rel=\"stylesheet\" type=\"text/css\" href=\"../Styles/stylesheet.css\" />\n"
              + "</head>\n"
              + "<body>\n"
-             + "  <h1>" + titulo + "</h1>\n"
+             + "  <h1>" + tituloSeguro + "</h1>\n"
              + contenidoHtml
              + "\n</body>\n"
              + "</html>";
+    }
+
+    /** Escapa las entidades XML de un texto para interpolarlo con seguridad en el XHTML. */
+    static String escaparXml(String texto) {
+        if (texto == null) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder(texto.length());
+        for (int i = 0; i < texto.length(); i++) {
+            char c = texto.charAt(i);
+            switch (c) {
+                case '&': sb.append("&amp;"); break;
+                case '<': sb.append("&lt;"); break;
+                case '>': sb.append("&gt;"); break;
+                case '"': sb.append("&quot;"); break;
+                case '\'': sb.append("&apos;"); break;
+                default: sb.append(c);
+            }
+        }
+        return sb.toString();
     }
 }

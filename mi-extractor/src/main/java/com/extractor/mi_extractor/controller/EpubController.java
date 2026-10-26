@@ -13,8 +13,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.UUID;
 
@@ -23,9 +23,11 @@ import java.util.UUID;
 public class EpubController {
 
     private final EpubService epubService;
+    private final UrlSafetyValidator urlSafetyValidator;
 
-    public EpubController(EpubService epubService) {
+    public EpubController(EpubService epubService, UrlSafetyValidator urlSafetyValidator) {
         this.epubService = epubService;
+        this.urlSafetyValidator = urlSafetyValidator;
     }
 
     @PostMapping("/upload")
@@ -82,11 +84,21 @@ public class EpubController {
             @RequestParam(value = "fin", defaultValue = "0") Integer fin,
             @RequestParam(value = "lista", defaultValue = "") String lista) {
 
+        // Seguridad (anti-SSRF): valida la URL en el borde antes de encolar nada.
+        urlSafetyValidator.validar(url);
+
         String id = UUID.randomUUID().toString();
 
         // Llamamos al servicio pasando TODO
         epubService.iniciarExtraccionWeb(id, url, opcion, hilos, limite, inicio, fin, lista);
 
         return id;
+    }
+
+    @ExceptionHandler(UrlNoPermitidaException.class)
+    public ResponseEntity<String> manejarUrlNoPermitida(UrlNoPermitidaException e) {
+        return ResponseEntity.badRequest()
+                .contentType(new MediaType(MediaType.TEXT_PLAIN, StandardCharsets.UTF_8))
+                .body(e.getMessage());
     }
 }

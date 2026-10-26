@@ -311,6 +311,10 @@ async function iniciarExtraccion() {
         if (response.ok) {
             const id = await response.text();
             consultarServidor(id);
+        } else {
+            const msg = await response.text();
+            pBar.className = 'progress-bar bg-danger';
+            statusTxt.innerHTML = '❌ ' + (msg || 'URL rechazada');
         }
     } catch (error) { statusTxt.innerHTML = '❌ Error de conexión'; }
 }
