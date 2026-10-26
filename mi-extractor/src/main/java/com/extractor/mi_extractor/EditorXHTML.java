@@ -1092,150 +1092,276 @@ public class EditorXHTML {
     }
 
     private void repararErroresComunes() {
-        System.out.println("Buscando errores comunes en " + archivosXHTML.length + " archivos .xhtml...");
+    System.out.println("Buscando errores comunes en " + archivosXHTML.length + " archivos .xhtml...");
 
-        Map<File, List<String>> reporteProblemas = new LinkedHashMap<>();
+    Map<File, List<String>> reporteProblemas = new LinkedHashMap<>();
+    Map<File, Map<String, List<Integer>>> ubicacionesErrores = new LinkedHashMap<>();
 
-        Pattern patronLink = Pattern.compile("(?i)<link[^>]+(?<!/)>");
-        Pattern patronHr = Pattern.compile("(?i)<hr[^>]*/?>");
-        Pattern patronImg = Pattern.compile("(?i)<img(?:\"[^\"]*\"|'[^']*'|[^'\">])*?(?<!/)\\s*>");
-        Pattern patronMark = Pattern.compile("(?i)<markdown[^>]+(?<!/)>");
-        Pattern patronBr = Pattern.compile("(?i)<br\\s*(?!/)[^>]*>");
-        Pattern patronWord = Pattern.compile("(?i)</?o:p[^>]*>");
-
-        // --- FASE 1: DIAGNÓSTICO ---
-        for (File archivo : archivosXHTML) {
-            String contenido = null;
+    // --- FASE 1: DIAGNÓSTICO CON TRACKING DE LÍNEAS ---
+    for (File archivo : archivosXHTML) {
+        try {
+            String contenido = Files.readString(archivo.toPath(), StandardCharsets.UTF_8);
+            String[] lineas = contenido.split("\n");
             List<String> erroresEncontrados = new ArrayList<>();
-            boolean parseoExitoso = true;
+            Map<String, List<Integer>> erroresEnEsteArchivo = new LinkedHashMap<>();
             boolean problemaDetectadoEsteArchivo = false;
 
-            try {
-                contenido = Files.readString(archivo.toPath(), StandardCharsets.UTF_8);
-                try {
-                    Jsoup.parse(contenido);
-                } catch (Exception e) {
-                    parseoExitoso = false;
-                    erroresEncontrados.add("Error de sintaxis XML/HTML (posible etiqueta inválida)");
-                    problemaDetectadoEsteArchivo = true;
-                }
-
-                if (contenido.contains("&nbsp;")) {
-                    erroresEncontrados.add("Contiene '&nbsp;'");
-                    problemaDetectadoEsteArchivo = true;
-                }
-                if (contenido.contains("markdown")) {
-                    erroresEncontrados.add("Contiene 'markdown'");
-                    problemaDetectadoEsteArchivo = true;
-                }
-                if (!contenido.trim().startsWith("<?xml")) {
-                    erroresEncontrados.add("Falta declaración '<?xml ... ?>'");
-                    problemaDetectadoEsteArchivo = true;
-                }
-                if (patronLink.matcher(contenido).find()) {
-                    erroresEncontrados.add("Etiqueta <link> no auto-cerrada");
-                    problemaDetectadoEsteArchivo = true;
-                }
-                if (patronHr.matcher(contenido).find()) {
-                    erroresEncontrados.add("Etiqueta <hr> no auto-cerrada");
-                    problemaDetectadoEsteArchivo = true;
-                }
-                if (patronImg.matcher(contenido).find()) {
-                    erroresEncontrados.add("Etiqueta <img> no auto-cerrada");
-                    problemaDetectadoEsteArchivo = true;
-                }
-                if (patronBr.matcher(contenido).find()) {
-                    erroresEncontrados.add("Etiqueta <br> no auto-cerrada");
-                    problemaDetectadoEsteArchivo = true;
-                }
-                if (patronWord.matcher(contenido).find()) {
-                    erroresEncontrados.add("Contiene etiquetas basura de Microsoft Word (<o:p>)");
-                    problemaDetectadoEsteArchivo = true;
-                }
-
-                // --- Añadir al mapa SI se detectó algún problema ---
-                if (problemaDetectadoEsteArchivo) {
-                    reporteProblemas.put(archivo, erroresEncontrados);
-                }
-
-            } catch (IOException e) {
-                System.err.println("Error CRÍTICO al leer el archivo: " + archivo.getName() + " - " + e.getMessage());
-                List<String> errorLectura = new ArrayList<>();
-                errorLectura.add("Error de lectura del archivo");
-                reporteProblemas.put(archivo, errorLectura);
+            // Buscar cada tipo de error Y registrar en qué línea está
+            if (!contenido.trim().startsWith("<?xml")) {
+                erroresEncontrados.add("Falta declaración '<?xml ... ?>'");
+                erroresEnEsteArchivo.put("Declaración XML", List.of(1));
+                problemaDetectadoEsteArchivo = true;
             }
-        }
-
-        // --- FASE 2: REPORTE Y CONFIRMACIÓN ---
-        if (reporteProblemas.isEmpty()) {
-            System.out.println("\n¡Perfecto! No se encontraron archivos que necesitaran reparación.");
-        } else {
-            System.out.println("\n--- Reporte Detallado de Errores de Formato ---");
-            reporteProblemas.forEach((archivo, listaErrores) -> {
-                System.out.println(" -> " + archivo.getName() + ":");
-                listaErrores.forEach(error -> System.out.println("    - " + error));
-            });
-
-            System.out.println("\nSe encontraron " + reporteProblemas.size() + " archivos con problemas.");
-            System.out.print("¿Quieres intentar repararlos todos ahora? (s/n): ");
-            String respuesta = this.scanner.nextLine();
-
-            // --- FASE 3: REPARACIÓN ---
-            if (respuesta.equalsIgnoreCase("s")) {
-                int archivosReparados = 0;
-                System.out.println("\nEmpezando la reparación...");
-                for (File archivo : reporteProblemas.keySet()) {
-                    try {
-                        Path rutaArchivo = archivo.toPath();
-                        String contenido = Files.readString(rutaArchivo, StandardCharsets.UTF_8);
-                        String contenidoOriginal = contenido;
-
-                        if (reporteProblemas.get(archivo).stream().noneMatch(e -> e.startsWith("Error de sintaxis"))) {
-
-                            if (!contenido.trim().startsWith("<?xml")) {
-                                contenido = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" + contenido;
-                            }
-                            contenido = contenido.replaceAll("&(?![A-Za-z0-9#]+;)", "&amp;");
-                            contenido = contenido.replaceAll("(?i)(<link[^>]+)(?<!/)>", "$1 />");
-                            contenido = contenido.replaceAll("(?i)<hr[^>]*/?>", "");
-                            contenido = contenido.replaceAll("(?i)(<img(?:\"[^\"]*\"|'[^']*'|[^'\">])*?)(\\s*)(?<!/)>",
-                                    "$1$2/>");
-                            contenido = contenido.replaceAll("(?i)<markdown[^>]*>", "");
-                            contenido = contenido.replaceAll("(?i)</markdown>", "");
-                            contenido = contenido.replaceAll("(?i)<markdown[^>]*/>", "");
-                            contenido = contenido.replaceAll("(?i)<br\\s*[^>]*>", "<br />");
-                            contenido = contenido.replaceAll("(?i)<o:p[^>]*>", "");
-                            contenido = contenido.replaceAll("(?i)</o:p>", "");
-
-                        }
-                        if (!contenido.equals(contenidoOriginal) && reporteProblemas.get(archivo).stream()
-                                .noneMatch(e -> e.startsWith("Error de lectura"))) {
-                            Files.writeString(rutaArchivo, contenido, StandardCharsets.UTF_8);
-                            System.out.println(" -> Archivo reparado: " + archivo.getName());
-                            archivosReparados++;
-                        } else if (reporteProblemas.get(archivo).stream()
-                                .anyMatch(e -> e.startsWith("Error de sintaxis"))) {
-                            System.out.println(" -> ATENCIÓN: " + archivo.getName()
-                                    + " tiene errores de sintaxis graves. No se intentó reparar automáticamente. Requiere revisión manual.");
-                        } else if (reporteProblemas.get(archivo).stream()
-                                .anyMatch(e -> e.startsWith("Error de lectura"))) {
-                            System.out.println(" -> ERROR: No se pudo reparar " + archivo.getName()
-                                    + " debido a un error de lectura.");
-                        } else {
-                        }
-
-                    } catch (IOException e) {
-                        System.err.println(
-                                "Error al intentar reparar el archivo: " + archivo.getName() + " - " + e.getMessage());
+            
+            // DOCTYPE
+            java.util.regex.Pattern patronDoctype = java.util.regex.Pattern.compile("(?i)<!doctype html>");
+            for (int i = 0; i < lineas.length; i++) {
+                if (patronDoctype.matcher(lineas[i]).find()) {
+                    if (!erroresEncontrados.contains("DOCTYPE en minúsculas")) {
+                        erroresEncontrados.add("DOCTYPE en minúsculas (rompe el XML)");
                     }
+                    erroresEnEsteArchivo.computeIfAbsent("DOCTYPE", k -> new ArrayList<>()).add(i + 1);
+                    problemaDetectadoEsteArchivo = true;
                 }
-                System.out.println(
-                        "\nProceso de reparación finalizado. Se modificaron " + archivosReparados + " archivos.");
-            } else {
-                System.out.println("\nNo se realizó ninguna modificación.");
             }
+
+            // Caracteres invisibles
+            java.util.regex.Pattern patronInvisibles = java.util.regex.Pattern.compile("[\\u200B-\\u200D\\uFEFF]");
+            for (int i = 0; i < lineas.length; i++) {
+                if (patronInvisibles.matcher(lineas[i]).find()) {
+                    if (!erroresEncontrados.contains("Contiene caracteres invisibles")) {
+                        erroresEncontrados.add("Contiene caracteres invisibles (Anti-scraping)");
+                    }
+                    erroresEnEsteArchivo.computeIfAbsent("Caracteres invisibles", k -> new ArrayList<>()).add(i + 1);
+                    problemaDetectadoEsteArchivo = true;
+                }
+            }
+
+            // Basura web (mgid-widget, _ngcontent, etc.)
+            java.util.regex.Pattern patronBasura = java.util.regex.Pattern.compile("mgid-widget|_ngcontent|<aside");
+            for (int i = 0; i < lineas.length; i++) {
+                if (patronBasura.matcher(lineas[i]).find()) {
+                    if (!erroresEncontrados.contains("Contiene basura web")) {
+                        erroresEncontrados.add("Contiene basura web (Anuncios o etiquetas de Angular)");
+                    }
+                    erroresEnEsteArchivo.computeIfAbsent("Basura web", k -> new ArrayList<>()).add(i + 1);
+                    problemaDetectadoEsteArchivo = true;
+                }
+            }
+
+            // &nbsp;
+            java.util.regex.Pattern patronNbsp = java.util.regex.Pattern.compile("&nbsp;");
+            for (int i = 0; i < lineas.length; i++) {
+                if (patronNbsp.matcher(lineas[i]).find()) {
+                    if (!erroresEncontrados.contains("Contiene '&nbsp;'")) {
+                        erroresEncontrados.add("Contiene '&nbsp;' (inválido en XML estricto)");
+                    }
+                    erroresEnEsteArchivo.computeIfAbsent("&nbsp;", k -> new ArrayList<>()).add(i + 1);
+                    problemaDetectadoEsteArchivo = true;
+                }
+            }
+
+            // Etiquetas no auto-cerradas
+            java.util.regex.Pattern patronImg = java.util.regex.Pattern.compile("(?i)<img(?:\"[^\"]*\"|'[^']*'|[^'\">])*?(?<!/)\\s*>");
+            java.util.regex.Pattern patronBr = java.util.regex.Pattern.compile("(?i)<br\\s*(?!/)[^>]*>");
+            java.util.regex.Pattern patronLink = java.util.regex.Pattern.compile("(?i)<link[^>]+(?<!/)>");
+            java.util.regex.Pattern patronHr = java.util.regex.Pattern.compile("(?i)<hr[^>]*/?>");
+            
+            for (int i = 0; i < lineas.length; i++) {
+                if (patronImg.matcher(lineas[i]).find()) {
+                    erroresEnEsteArchivo.computeIfAbsent("img", k -> new ArrayList<>()).add(i + 1);
+                    problemaDetectadoEsteArchivo = true;
+                }
+                if (patronBr.matcher(lineas[i]).find()) {
+                    erroresEnEsteArchivo.computeIfAbsent("br", k -> new ArrayList<>()).add(i + 1);
+                    problemaDetectadoEsteArchivo = true;
+                }
+                if (patronLink.matcher(lineas[i]).find()) {
+                    erroresEnEsteArchivo.computeIfAbsent("link", k -> new ArrayList<>()).add(i + 1);
+                    problemaDetectadoEsteArchivo = true;
+                }
+                if (patronHr.matcher(lineas[i]).find()) {
+                    erroresEnEsteArchivo.computeIfAbsent("hr", k -> new ArrayList<>()).add(i + 1);
+                    problemaDetectadoEsteArchivo = true;
+                }
+            }
+
+            // Markdown y o:p
+            java.util.regex.Pattern patronMarkdown = java.util.regex.Pattern.compile("(?i)<markdown|</?o:p");
+            for (int i = 0; i < lineas.length; i++) {
+                if (patronMarkdown.matcher(lineas[i]).find()) {
+                    if (lineas[i].toLowerCase().contains("markdown")) {
+                        erroresEnEsteArchivo.computeIfAbsent("markdown", k -> new ArrayList<>()).add(i + 1);
+                    }
+                    if (lineas[i].toLowerCase().contains("o:p")) {
+                        erroresEnEsteArchivo.computeIfAbsent("o:p", k -> new ArrayList<>()).add(i + 1);
+                    }
+                    problemaDetectadoEsteArchivo = true;
+                }
+            }
+
+            // Registrar problemas
+            if (problemaDetectadoEsteArchivo) {
+                reporteProblemas.put(archivo, erroresEncontrados);
+                ubicacionesErrores.put(archivo, erroresEnEsteArchivo);
+            }
+
+        } catch (IOException e) {
+            System.err.println("Error CRÍTICO al leer el archivo: " + archivo.getName() + " - " + e.getMessage());
+            reporteProblemas.put(archivo, List.of("Error de lectura del archivo"));
         }
     }
+
+    // --- FASE 2: REPORTE Y CONFIRMACIÓN ---
+    if (reporteProblemas.isEmpty()) {
+        System.out.println("\n¡Perfecto! No se encontraron archivos que necesitaran reparación.");
+        return;
+    } 
+    
+    System.out.println("\n--- Reporte Detallado de Errores de Formato ---");
+    reporteProblemas.forEach((archivo, listaErrores) -> {
+        System.out.println(" -> " + archivo.getName() + ":");
+        listaErrores.forEach(error -> System.out.println("    - " + error));
+    });
+
+    System.out.println("\nSe encontraron " + reporteProblemas.size() + " archivos con problemas.");
+    System.out.print("¿Quieres intentar repararlos todos ahora? (s/n): ");
+    String respuesta = this.scanner.nextLine();
+
+    // --- FASE 3: REPARACIÓN AVANZADA CON JSOUP ---
+    if (respuesta.equalsIgnoreCase("s")) {
+        int archivosReparados = 0;
+        int archivosFallidos = 0;
+        Map<String, Integer> conteoReparaciones = new LinkedHashMap<>();  // Contar reparaciones por tipo
+        Map<String, Map<String, List<Integer>>> resumenReparaciones = new LinkedHashMap<>();  // errorType -> archivo -> líneas
+        
+        System.out.println("\nEmpezando la reparación...");
+        
+        for (File archivo : reporteProblemas.keySet()) {
+            if (reporteProblemas.get(archivo).contains("Error de lectura del archivo")) {
+                System.out.println(" -> ERROR: No se pudo reparar " + archivo.getName() + " debido a un error de lectura.");
+                archivosFallidos++;
+                continue;
+            }
+
+            try {
+                Path rutaArchivo = archivo.toPath();
+                String contenido = Files.readString(rutaArchivo, StandardCharsets.UTF_8);
+                Map<String, List<Integer>> erroresEsteArchivo = ubicacionesErrores.get(archivo);
+
+                // Registrar qué se va a reparar en este archivo
+                if (erroresEsteArchivo != null) {
+                    for (String tipoError : erroresEsteArchivo.keySet()) {
+                        resumenReparaciones.computeIfAbsent(tipoError, k -> new LinkedHashMap<>())
+                                          .put(archivo.getName(), erroresEsteArchivo.get(tipoError));
+                        conteoReparaciones.put(tipoError, conteoReparaciones.getOrDefault(tipoError, 0) + 1);
+                    }
+                }
+
+                // 1. Limpieza PRE-JSoup
+                contenido = contenido.replaceAll("[\\u200B-\\u200D\\uFEFF]", "");
+                contenido = contenido.replaceAll("(?i)<!doctype html>", "");
+                contenido = contenido.replaceAll("<!--\\?xml.*?\\?-->", "");
+                contenido = contenido.replace("&nbsp;", "&#160;");
+
+                // 2. Parseo estricto XML con JSoup
+                org.jsoup.nodes.Document doc = org.jsoup.Jsoup.parse(contenido, "", org.jsoup.parser.Parser.xmlParser());
+                doc.outputSettings()
+                   .syntax(org.jsoup.nodes.Document.OutputSettings.Syntax.xml)
+                   .escapeMode(org.jsoup.nodes.Entities.EscapeMode.xhtml)
+                   .prettyPrint(false);
+
+                // 3. Eliminar basura estructural
+                doc.select("aside, mgid-widget, script, style, iframe, markdown, o\\:p, hr").remove();
+
+                // 4. Limpiar atributos basura (mantener aria-*)
+                for (org.jsoup.nodes.Element el : doc.getAllElements()) {
+                    List<String> keysToRemove = new ArrayList<>();
+                    for (org.jsoup.nodes.Attribute attr : el.attributes()) {
+                        if (attr.getKey().startsWith("_ng") || 
+                            (attr.getKey().startsWith("data-") && !attr.getKey().equals("data-id"))) {
+                            keysToRemove.add(attr.getKey());
+                        }
+                    }
+                    for (String key : keysToRemove) {
+                        el.removeAttr(key);
+                    }
+                }
+
+                // 5. Generar documento final
+                String contenidoFinal = doc.outerHtml();
+                contenidoFinal = contenidoFinal.replaceAll("(?i)<!DOCTYPE[^>]*>\\s*", "");
+                
+                if (contenidoFinal.startsWith("<?xml")) {
+                    contenidoFinal = contenidoFinal.replaceFirst("<\\?xml.*?\\?>\\s*", "");
+                }
+                contenidoFinal = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" + 
+                                 "<!DOCTYPE html>\n" + 
+                                 contenidoFinal.trim();
+
+                // 6. VALIDACIÓN FINAL
+                boolean validacionExitosa = false;
+                try {
+                    org.jsoup.Jsoup.parse(contenidoFinal, "", org.jsoup.parser.Parser.xmlParser());
+                    validacionExitosa = true;
+                } catch (Exception e) {
+                    System.out.println(" ⚠ Advertencia: El archivo " + archivo.getName() + 
+                                     " puede tener errores XML residuales. Intenta abrir en Sigil para verificar.");
+                }
+
+                // 7. Guardar el archivo reparado
+                Files.writeString(rutaArchivo, contenidoFinal, StandardCharsets.UTF_8);
+                
+                if (validacionExitosa) {
+                    System.out.println(" ✓ Archivo reparado con éxito: " + archivo.getName());
+                } else {
+                    System.out.println(" ⚠ Archivo procesado pero con posibles advertencias: " + archivo.getName());
+                }
+                archivosReparados++;
+
+            } catch (Exception e) {
+                System.err.println(" ✗ Error al intentar reparar el archivo: " + archivo.getName() + 
+                                 " - " + e.getMessage());
+                archivosFallidos++;
+            }
+        }
+        
+        // --- RESUMEN FINAL GRANULAR ---
+        System.out.println("\n" + "=".repeat(70));
+        System.out.println("RESUMEN DETALLADO DE REPARACIONES POR TIPO DE ERROR:");
+        System.out.println("=".repeat(70));
+        
+        if (resumenReparaciones.isEmpty()) {
+            System.out.println("No se realizó ninguna reparación.");
+        } else {
+            for (String tipoError : resumenReparaciones.keySet()) {
+                Map<String, List<Integer>> detallesError = resumenReparaciones.get(tipoError);
+                int totalOcurrencias = detallesError.values().stream().mapToInt(List::size).sum();
+                int totalCapitulos = detallesError.size();
+                
+                System.out.println("\n✅ " + tipoError.toUpperCase() + " - Reparado en " + totalCapitulos + " capítulo(s) (" + totalOcurrencias + " ocurrencias):");
+                
+                for (String nombreArchivo : detallesError.keySet()) {
+                    int ocurrenciasEnArchivo = detallesError.get(nombreArchivo).size();
+                    System.out.println("   • " + nombreArchivo + " (" + ocurrenciasEnArchivo + ")");
+                }
+            }
+        }
+        
+        System.out.println("\n" + "=".repeat(70));
+        System.out.println("RESUMEN EJECUTIVO:");
+        System.out.println(" ✓ Archivos reparados exitosamente: " + archivosReparados);
+        System.out.println(" ✗ Archivos con errores: " + archivosFallidos);
+        System.out.println(" 📊 Total de errores reparados: " + 
+                          resumenReparaciones.values().stream()
+                                             .flatMap(m -> m.values().stream())
+                                             .mapToInt(List::size).sum());
+        System.out.println("=".repeat(70));
+        
+    } else {
+        System.out.println("\nNo se realizó ninguna modificación.");
+    }
+}
 
     // --- MÉTODOS PARA EPUB ---
 

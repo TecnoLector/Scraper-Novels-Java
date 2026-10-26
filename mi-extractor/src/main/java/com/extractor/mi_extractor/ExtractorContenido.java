@@ -18,7 +18,11 @@ public class ExtractorContenido {
     };
     
     private final String[] selectoresContenedor = {
-        "div.skn-chp-chapter-content", "div#chapter-content", "div.entry-content", "article"
+        "div.skn-chp-chapter-content.ng-star-inserted",
+        "div.skn-chp-chapter-content",
+        "div#chapter-content", 
+        "div.entry-content", 
+        "article"
     };
 
     public Capitulo extraer(String html, SitioWebConfig config) {
@@ -96,10 +100,22 @@ public class ExtractorContenido {
             } catch (Exception e) { }
             
             String contenidoHtml = contenidoElement.html().replace("&nbsp;", "&#160;");
+            
+            // VALIDACIÓN: Verificar que el contenido NO esté vacío
+            if (contenidoHtml.trim().isEmpty()) {
+                System.err.println("ADVERTENCIA: El contenido extraído está vacío. Guardando HTML de error...");
+                guardarHtmlDeError(html);
+                return null;
+            }
+            
             return new Capitulo(titulo, contenidoHtml);
         }
         
-        System.err.println("Error: No se pudo extraer capítulo. HTML parcial guardado.");
+        // 🔍 DIAGNÓSTICO MEJORADO
+        System.err.println("Error: No se pudo extraer capítulo.");
+        if (tituloElement == null) System.err.println("   - Titulo NO encontrado");
+        if (contenidoElement == null) System.err.println("   - Contenido NO encontrado");
+        System.err.println("   Guardando HTML de error para diagnóstico...");
         guardarHtmlDeError(html);
         return null;
     }
