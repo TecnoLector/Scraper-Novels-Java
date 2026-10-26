@@ -37,7 +37,10 @@ debug_pagina_fallida.html
 *.log
 *.xhtml
 *.epub
+# Ignora HTML sueltos (p. ej. volcados de depuracion) pero NO los templates/estaticos versionados
 *.html
+!src/main/resources/static/**/*.html
+!src/main/resources/templates/**/*.html
 
 # Carpetas de salida (si las tienes)
 Libros Extraidos/

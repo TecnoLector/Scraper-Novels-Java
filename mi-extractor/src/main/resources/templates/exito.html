@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>¡Éxito!</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+    <div class="container">
+        <h2>✨ ¡Procesado!</h2>
+        <div class="alert alert-success" th:text="${mensaje}"></div>
+        
+        <p>Tu libro ya está listo en versión 3.0.</p>
+        
+        <a th:href="@{/epub/descargar(carpeta=${carpeta}, archivo=${rutaDescarga})}" 
+           class="btn-download">
+           📥 Descargar EPUB v3
+        </a>
+        
+        <a href="/epub/" class="footer-link">Convertir otro libro</a>
+    </div>
+</body>
+</html>

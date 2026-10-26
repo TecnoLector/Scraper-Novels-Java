@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suite de Novelas</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+
+<body>
+    <button id="themeToggle" class="theme-btn" title="Alternar Modo Oscuro">🌙</button>
+
+    <div class="container">
+        <h2>📚 Suite de Ingeniería Editorial</h2>
+        <p class="subtitle">Automatiza la extracción, limpieza y maquetación de tus novelas</p>
+
+        <div class="tabs-container">
+            <button class="tab-btn active" onclick="cambiarModulo('tab-extraccion', this)">🌐 Extractor Web</button>
+            <button class="tab-btn" onclick="cambiarModulo('tab-limpieza', this)">🧹 Editor XHTML</button>
+            <button class="tab-btn" onclick="cambiarModulo('tab-utilidades', this)">🛠️ Utilidades EPUB</button>
+        </div>
+
+        <div id="tab-extraccion" class="modulo-seccion" style="display: block;">
+    <div class="modulo-header">
+        <h3>Motor de Extracción Universal</h3>
+        <p>Selecciona el método de descarga igual que en la consola.</p>
+    </div>
+    
+    <div class="input-group">
+        <label>Tipo de Extracción:</label>
+        <select id="tipoExtraccion" class="form-control mb-3" onchange="actualizarInterfazExtraccion()">
+            <option value="1">1. Descargar TODA la Novela</option>
+            <option value="2">2. Descargar HASTA un número (Límite)</option>
+            <option value="4">4. Descargar un RANGO de capítulos</option>
+            <option value="5">5. Descargar una LISTA específica</option>
+            <option value="6">6. Descargar SECUENCIALMENTE (Siguiente >)</option>
+        </select>
+    </div>
+
+    <div class="input-group">
+        <label id="labelUrl">URL de la Portada:</label>
+        <input type="text" id="inputUrlScrap" class="form-control mb-3" placeholder="https://...">
+    </div>
+
+    <div id="campoRango" class="row mb-3" style="display:none;">
+        <div class="half">
+            <label>Desde:</label>
+            <input type="number" id="inputInicio" class="form-control" placeholder="1">
+        </div>
+        <div class="half">
+            <label>Hasta:</label>
+            <input type="number" id="inputFin" class="form-control" placeholder="100">
+        </div>
+    </div>
+
+    <div id="campoLista" class="mb-3" style="display:none;">
+        <label>Lista de capítulos (comas):</label>
+        <input type="text" id="inputLista" class="form-control" placeholder="1, 5, 10, 22">
+    </div>
+
+    <div id="campoLimite" class="mb-3" style="display:none;">
+        <label id="labelLimite">Número de capítulos:</label>
+        <input type="number" id="inputLimiteCap" class="form-control" value="0">
+    </div>
+
+    <div class="input-group">
+        <label>Hilos (Navegadores paralelos):</label>
+        <input type="number" id="inputHilos" class="form-control" value="3" min="1" max="10">
+    </div>
+    
+    <button class="btn-primary" onclick="iniciarExtraccion()">Comenzar Extracción</button>
+</div>
+
+        <div id="tab-limpieza" class="modulo-seccion" style="display: none;">
+            <div class="modulo-header">
+                <h3>Motor de Limpieza Regex</h3>
+                <p>Sube tus archivos .xhtml crudos para estandarizar títulos y convertirlos en un EPUB 3.0.</p>
+            </div>
+            <button class="btn-primary" disabled>Próximamente</button>
+        </div>
+
+        <div id="tab-utilidades" class="modulo-seccion" style="display: none;">
+
+            <label><strong>Selecciona una herramienta:</strong></label>
+            <select id="accionSelector" class="form-control mb-3" onchange="actualizarFormulario()">
+                <option value="DIVIDIR">1. Dividir EPUB</option>
+                <option value="DESCOMPRIMIR">2. Descomprimir EPUB (ZIP)</option>
+                <option value="REEMPAQUETAR">3. Re-empaquetar Carpeta (OCF)</option>
+                <option value="INICIO_LIBRO">4. Insertar 'Inicio de Libro'</option>
+                <option value="CONVERTIR_V3" selected>5. Convertir EPUB v2 a v3</option>
+            </select>
+
+            <div id="cajaDividir" class="opciones-extra" style="display: none;">
+                <label><strong>Opciones de División:</strong></label>
+                <select id="tipoDivision" class="form-control mb-3">
+                    <option value="1">Por rango (Desde el Cap 1 hasta el N)</option>
+                    <option value="2">En N Partes iguales</option>
+                    <option value="3">En trozos de N capítulos (Chunks)</option>
+                    <option value="4">Personalizado</option>
+                </select>
+                <input type="number" id="inputParametro" class="form-control mb-3"
+                    placeholder="Escribe el parámetro aquí (Ej: 50)" min="1">
+                <input type="text" id="inputSitioDiv" class="form-control mb-3"
+                    placeholder="(Opcional) Sitio de extracción">
+                <input type="text" id="inputCreadorDiv" class="form-control mb-3"
+                    placeholder="(Opcional) Creador o Alias">
+            </div>
+
+            <div id="cajaInicioLibro" class="opciones-extra" style="display: none;">
+                <label><strong>Configuración de Metadatos:</strong></label>
+                <input type="text" id="inputSitioInicio" class="form-control mb-3"
+                    placeholder="(Opcional) Sitio de extracción">
+                <input type="text" id="inputCreadorInicio" class="form-control mb-3"
+                    placeholder="(Opcional) Creador o Alias">
+                <hr class="divider">
+                <div id="contenedorPaginas">
+                </div>
+                <button type="button" class="btn-secondary" onclick="agregarFilaPagina()">+ Añadir otra página</button>
+            </div>
+
+            <div class="file-upload-container mt-3">
+                <input type="file" id="fileInput" class="file-input-hidden" onchange="actualizarNombreArchivo()">
+                <label for="fileInput" class="file-upload-label">
+                    <span id="fileNameDisplay">📂 Haz clic para seleccionar archivo...</span>
+                </label>
+            </div>
+
+            <button class="btn-primary" onclick="comenzarProceso()">Ejecutar Utilidad</button>
+        </div>
+
+        <hr class="divider">
+        
+        <div class="progress-container" id="pContainer" style="display: none;">
+            <div class="progress-bar" id="pBar" style="width: 0%">0%</div>
+        </div>
+        
+        <p id="statusTxt"></p>
+
+        <div id="hilosContainer" style="display: none; margin-top: 15px; text-align: left;">
+            </div>
+
+    </div> <script th:src="@{/js/script.js}"></script>
+</body>
+</html>

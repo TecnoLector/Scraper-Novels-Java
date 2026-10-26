@@ -9,18 +9,14 @@ import com.extractor.mi_extractor.processor.SplitProcessor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Comparator;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Service
 public class EpubService {
@@ -41,6 +37,7 @@ public class EpubService {
 
     private final Map<String, String> estados = new ConcurrentHashMap<>();
     private final Map<String, Path> archivosListos = new ConcurrentHashMap<>();
+    private final Map<String, Instant> creadoEn = new ConcurrentHashMap<>();
 
     public String getEstado(String id) {
         return estados.getOrDefault(id, "ESPERANDO...");
@@ -53,6 +50,7 @@ public class EpubService {
     public void iniciarProceso(String id, byte[] bytes, String nombre, String accion,
             Integer tipoDivision, Integer parametro, String sitio, String creador, List<String> nombresPaginas,
             List<Integer> capitulosAnteriores, MultipartFile[] folderFiles) {
+        creadoEn.put(id, Instant.now());
         new Thread(() -> {
             try {
                 Path dir = storage.crearCarpetaTemporal("epub_");
@@ -95,7 +93,7 @@ public class EpubService {
 
                         zipProcessor.reempaquetarComoEpub(id, carpetaFuente, epubSalida, estados);
 
-                        eliminarCarpetaRecursiva(carpetaFuente);
+                        storage.eliminarRecursivo(carpetaFuente);
                         archivosListos.put(id, epubSalida);
                         break;
 
@@ -133,27 +131,29 @@ public class EpubService {
         }).start();
     }
 
-    private void eliminarCarpetaRecursiva(Path ruta) {
-        if (ruta == null || !Files.exists(ruta))
-            return;
-
-        try (Stream<Path> walk = Files.walk(ruta)) {
-            List<File> archivosABorrar = walk
-                    .sorted(Comparator.reverseOrder())
-                    .map(Path::toFile)
-                    .collect(Collectors.toList());
-
-            for (File archivo : archivosABorrar) {
-                if (!archivo.delete()) {
-                    System.err.println("No se pudo borrar: " + archivo.getAbsolutePath());
-                }
+    /**
+     * Elimina de los mapas de estado los trabajos cuya antiguedad supere el TTL,
+     * para evitar que {@code estados}/{@code archivosListos} crezcan sin limite.
+     *
+     * @return numero de trabajos purgados.
+     */
+    public int purgarExpirados(Duration ttl) {
+        Instant limite = Instant.now().minus(ttl);
+        int purgados = 0;
+        for (Map.Entry<String, Instant> entrada : creadoEn.entrySet()) {
+            if (entrada.getValue().isBefore(limite)) {
+                String id = entrada.getKey();
+                creadoEn.remove(id);
+                estados.remove(id);
+                archivosListos.remove(id);
+                purgados++;
             }
-        } catch (IOException e) {
-            System.err.println("Error al limpiar temporales: " + e.getMessage());
         }
+        return purgados;
     }
 
     public void iniciarExtraccionWeb(String id, String url, Integer opcion, Integer hilos, Integer limite, Integer inicio, Integer fin, String lista) {
+        creadoEn.put(id, Instant.now());
         estados.put(id, "5% - Inicializando motor multihilo...");
         
         CompletableFuture.runAsync(() -> {

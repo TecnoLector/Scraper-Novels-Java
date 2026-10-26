@@ -1,5 +1,6 @@
 package com.extractor.mi_extractor.processor;
 
+import com.extractor.mi_extractor.service.StorageService;
 import io.documentnode.epub4j.domain.*;
 import io.documentnode.epub4j.epub.EpubReader;
 import io.documentnode.epub4j.epub.EpubWriter;
@@ -19,9 +20,11 @@ import java.util.zip.ZipOutputStream;
 public class SplitProcessor {
 
     private final ZipArchiveProcessor zipProcessor;
+    private final StorageService storage;
 
-    public SplitProcessor(ZipArchiveProcessor zipProcessor) {
+    public SplitProcessor(ZipArchiveProcessor zipProcessor, StorageService storage) {
         this.zipProcessor = zipProcessor;
+        this.storage = storage;
     }
 
     public void procesarDivision(String id, Path inputOriginal, Path outputZip, String nombreBase, 
@@ -32,7 +35,7 @@ public class SplitProcessor {
             Book libroOriginal = new EpubReader().readEpub(new FileInputStream(inputOriginal.toFile()));
 
             // Crear una carpeta temporal para guardar los pedazos antes de comprimirlos
-            Path tempDirPedazos = Files.createTempDirectory("pedazos_");
+            Path tempDirPedazos = storage.crearCarpetaTemporal("pedazos_");
 
             estados.put(id, "Dividiendo libro...");
             

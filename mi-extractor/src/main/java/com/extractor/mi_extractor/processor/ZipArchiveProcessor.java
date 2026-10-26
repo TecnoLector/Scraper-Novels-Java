@@ -1,5 +1,6 @@
 package com.extractor.mi_extractor.processor;
 
+import com.extractor.mi_extractor.service.StorageService;
 import org.springframework.stereotype.Component;
 import java.io.*;
 import java.nio.file.Files;
@@ -14,10 +15,16 @@ import java.util.zip.ZipOutputStream;
 @Component
 public class ZipArchiveProcessor {
 
+    private final StorageService storage;
+
+    public ZipArchiveProcessor(StorageService storage) {
+        this.storage = storage;
+    }
+
     public void descomprimirEpub(String id, Path inputEpub, Path outputZipResult, Map<String, String> estados) {
         try {
             estados.put(id, "Descomprimiendo EPUB...");
-            Path tempExtractDir = Files.createTempDirectory("extract_");
+            Path tempExtractDir = storage.crearCarpetaTemporal("extract_");
             
             descomprimirZip(inputEpub, tempExtractDir);
 
