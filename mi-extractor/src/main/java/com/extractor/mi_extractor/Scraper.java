@@ -145,6 +145,37 @@ public class Scraper {
         }
     }
 
+    /** Selector del cartel de capítulo VIP/bloqueado en SkyNovels. */
+    private static final By SELECTOR_VIP = By.cssSelector("div.skn-vip-locked-message");
+
+    /** Resultado de pedir un capítulo: trae el HTML, o indica que es VIP (bloqueado). */
+    public static class ResultadoCapitulo {
+        public final String html; // null si no hubo contenido
+        public final boolean vip;
+
+        ResultadoCapitulo(String html, boolean vip) {
+            this.html = html;
+            this.vip = vip;
+        }
+    }
+
+    /**
+     * Espera a que aparezca el contenido del capítulo O el cartel VIP, lo que ocurra primero.
+     * Así los capítulos VIP se detectan al instante y no gastan reintentos.
+     */
+    public ResultadoCapitulo obtenerContenidoOVip() {
+        By contenido = By.cssSelector(configActual.getSelectorContenido());
+        try {
+            wait.until(d -> !d.findElements(contenido).isEmpty() || !d.findElements(SELECTOR_VIP).isEmpty());
+        } catch (Exception e) {
+            return new ResultadoCapitulo(null, false); // timeout -> fallo real (reintentar)
+        }
+        if (!driver.findElements(SELECTOR_VIP).isEmpty()) {
+            return new ResultadoCapitulo(null, true); // VIP: no hay texto que bajar
+        }
+        return new ResultadoCapitulo(driver.getPageSource(), false);
+    }
+
     public String obtenerHtmlDeIndice() {
         // Acumulador y bandera a nivel de método para poder SALVAR lo capturado si el navegador muere.
         java.util.Set<String> enlacesGuardados = new java.util.LinkedHashSet<>();

@@ -416,12 +416,22 @@ public class MenuExtractor {
      *   4: rango {@code [inicio, fin]}; 5: lista CSV en {@code listaStr}.</li>
      * </ul>
      */
-    /** Escribe FALTANTES.txt en la raíz de la salida con los capítulos que no se pudieron bajar. */
-    private static void escribirFaltantes(java.nio.file.Path pathBase, java.util.Set<Double> faltantes) {
+    /** Escribe FALTANTES.txt con dos secciones: VIP (bloqueados) y fallos reales (no VIP). */
+    private static void escribirReporteFaltantes(java.nio.file.Path pathBase, java.util.Set<Double> faltantes,
+            java.util.Set<Double> vip) {
         try {
-            String contenido = "Capitulos que NO se pudieron descargar (" + faltantes.size() + "):\n"
-                    + formatearListaCaps(faltantes) + "\n";
-            java.nio.file.Files.writeString(pathBase.resolve("FALTANTES.txt"), contenido);
+            StringBuilder sb = new StringBuilder();
+            if (!vip.isEmpty()) {
+                sb.append("Capitulos VIP (bloqueados, requieren desbloqueo en tu cuenta) (")
+                        .append(vip.size()).append("):\n")
+                        .append(formatearListaCaps(vip)).append("\n\n");
+            }
+            if (!faltantes.isEmpty()) {
+                sb.append("Capitulos NO descargados por error (NO VIP) (")
+                        .append(faltantes.size()).append("):\n")
+                        .append(formatearListaCaps(faltantes)).append("\n");
+            }
+            java.nio.file.Files.writeString(pathBase.resolve("FALTANTES.txt"), sb.toString());
         } catch (Exception e) {
             System.err.println("No se pudo escribir FALTANTES.txt: " + e.getMessage());
         }
@@ -537,6 +547,8 @@ public class MenuExtractor {
         
         // --- NUEVO: LISTA SEGURA PARA RECOLECTAR ERRORES ORDENADOS ---
         java.util.Set<Double> capitulosFallidos = new java.util.concurrent.ConcurrentSkipListSet<>();
+        // Capítulos VIP (bloqueados): no son errores, requieren desbloqueo en tu cuenta.
+        java.util.Set<Double> capitulosVip = new java.util.concurrent.ConcurrentSkipListSet<>();
 
         System.out.println("\n>>> INICIANDO DESCARGA CON " + numeroHilos + " NAVEGADORES...");
 
@@ -561,17 +573,19 @@ public class MenuExtractor {
                         String urlCap = entrada.getValue();
                         
                         boolean exito = false; // Bandera para saber si se logró guardar
+                        boolean esVip = false; // Capítulo VIP/bloqueado: se salta al instante
                         System.out.println("[Hilo " + Thread.currentThread().getId() + "] Bajando Capitulo #" + numCap);
 
-                        // Reintentos: los fallos suelen ser transitorios (página lenta). Guard del
-                        // null evita el NPE de Jsoup.parse(null); se recrea el navegador solo si hubo
-                        // excepción (pudo quedar flojo/muerto).
-                        for (int intento = 1; intento <= 3 && !exito; intento++) {
+                        // Reintentos solo para fallos transitorios. Un VIP se detecta al instante y
+                        // corta el bucle (no gasta reintentos). Se recrea el navegador si hubo excepción.
+                        for (int intento = 1; intento <= 3 && !exito && !esVip; intento++) {
                             try {
                                 scraperHilo.navegarA(urlCap);
-                                String html = scraperHilo.obtenerHtmlDePagina();
-                                if (html != null) {
-                                    Capitulo capitulo = new ExtractorContenido().extraer(html, scraperHilo.getConfig());
+                                Scraper.ResultadoCapitulo r = scraperHilo.obtenerContenidoOVip();
+                                if (r.vip) {
+                                    esVip = true;
+                                } else if (r.html != null) {
+                                    Capitulo capitulo = new ExtractorContenido().extraer(r.html, scraperHilo.getConfig());
                                     if (capitulo != null) {
                                         new EscritorArchivo().guardarCapitulo(capitulo, rutaDeGuardado, numCap);
                                         contadorExitos.incrementAndGet();
@@ -583,13 +597,15 @@ public class MenuExtractor {
                                 scraperHilo.cerrar();
                                 scraperHilo = new Scraper();
                             }
-                            if (!exito && intento < 3) {
+                            if (!exito && !esVip && intento < 3) {
                                 System.out.println("   > Cap #" + numCap + " no disponible, reintento " + (intento + 1) + "/3...");
                             }
                         }
 
-                        // Si tras los reintentos no se logró, anotamos el error (con la URL para diagnosticar).
-                        if (!exito) {
+                        if (esVip) {
+                            System.out.println("VIP Cap #" + numCap + " es VIP (bloqueado), se omite.");
+                            capitulosVip.add(numCap);
+                        } else if (!exito) {
                             System.err.println("X Cap #" + numCap + " no se pudo bajar tras 3 intentos: " + urlCap);
                             capitulosFallidos.add(numCap);
                         }
@@ -622,25 +638,15 @@ public class MenuExtractor {
         System.out.println("Descargados correctamente: " + contadorExitos.get() + "/" + totalCapitulos);
         System.out.println("Cantidad de hilos: " + numeroHilos);
         
-        // --- REPORTE DE ERRORES FORMATADO ---
+        // --- REPORTE: VIP (bloqueados) vs fallos reales ---
+        if (!capitulosVip.isEmpty()) {
+            System.out.println("\n VIP (bloqueados, requieren desbloqueo en tu cuenta): " + capitulosVip.size());
+            System.out.println(formatearListaCaps(capitulosVip));
+        }
         if (!capitulosFallidos.isEmpty()) {
-            System.out.println("\n ATENCIÓN: Hubo errores al descargar " + capitulosFallidos.size() + " capítulos.");
-            System.out.println("\nCapitulos: ");
-            
-            StringBuilder sbErrores = new StringBuilder();
-            for (Double cap : capitulosFallidos) {
-                if (sbErrores.length() > 0) {
-                    sbErrores.append(", ");
-                }
-                // Quitamos el ".0" para que se vea limpio (ej: 1878 en lugar de 1878.0)
-                if (cap % 1 == 0) {
-                    sbErrores.append(cap.intValue());
-                } else {
-                    sbErrores.append(cap);
-                }
-            }
-            System.out.println(sbErrores.toString());
-            System.out.println("\n");
+            System.out.println("\n ATENCIÓN: fallaron " + capitulosFallidos.size() + " capítulos (error, NO VIP):");
+            System.out.println(formatearListaCaps(capitulosFallidos));
+            System.out.println();
         }
 
         System.out.println("--- Fin del Módulo Extractor ---");
@@ -753,6 +759,8 @@ public class MenuExtractor {
             AtomicInteger globales = new AtomicInteger(0);
             // Capítulos planificados que NO se llegaron a guardar (números exactos, decimales incluidos).
             java.util.Set<Double> faltantes = new java.util.concurrent.ConcurrentSkipListSet<>();
+            // Capítulos VIP (bloqueados): no son errores, requieren desbloqueo en tu cuenta.
+            java.util.Set<Double> vip = new java.util.concurrent.ConcurrentSkipListSet<>();
             for (int i = 0; i < numHilosEfectivos; i++) {
                 msgHilos[i] = "Iniciando...";
                 pctHilos[i] = 0;
@@ -800,12 +808,15 @@ public class MenuExtractor {
                             // lenta). El guard del null evita el NPE de Jsoup.parse(null); solo se
                             // recrea el navegador si hubo excepción (pudo quedar flojo/muerto).
                             boolean ok = false;
-                            for (int intento = 1; intento <= 3 && !ok; intento++) {
+                            boolean esVip = false;
+                            for (int intento = 1; intento <= 3 && !ok && !esVip; intento++) {
                                 try {
                                     sH.navegarA(filtrados.get(nCap));
-                                    String html = sH.obtenerHtmlDePagina();
-                                    if (html != null) {
-                                        Capitulo c = eH.extraer(html, sH.getConfig());
+                                    Scraper.ResultadoCapitulo r = sH.obtenerContenidoOVip();
+                                    if (r.vip) {
+                                        esVip = true;
+                                    } else if (r.html != null) {
+                                        Capitulo c = eH.extraer(r.html, sH.getConfig());
                                         if (c != null) {
                                             wH.guardarCapitulo(c, rutaBaseStr, nCap);
                                             ok = true;
@@ -816,7 +827,9 @@ public class MenuExtractor {
                                     sH = new Scraper();
                                 }
                             }
-                            if (!ok) {
+                            if (esVip) {
+                                vip.add(nCap);
+                            } else if (!ok) {
                                 faltantes.add(nCap);
                             }
 
@@ -838,11 +851,18 @@ public class MenuExtractor {
             executor.shutdown();
             executor.awaitTermination(5, TimeUnit.HOURS);
 
-            // Reporte de faltantes: capítulos planificados que no se guardaron (números exactos).
-            if (!faltantes.isEmpty()) {
-                escribirFaltantes(pathBase, faltantes);
-                progresoWeb.accept("95% - Completado con " + faltantes.size()
-                        + " capítulos sin bajar (ver FALTANTES.txt): " + formatearListaCaps(faltantes));
+            // Reporte: VIP (bloqueados) y fallos reales, con números exactos.
+            if (!faltantes.isEmpty() || !vip.isEmpty()) {
+                escribirReporteFaltantes(pathBase, faltantes, vip);
+                StringBuilder resumen = new StringBuilder("95% - Completado.");
+                if (!vip.isEmpty()) {
+                    resumen.append(" VIP (bloqueados): ").append(vip.size()).append('.');
+                }
+                if (!faltantes.isEmpty()) {
+                    resumen.append(" Sin bajar: ").append(formatearListaCaps(faltantes)).append('.');
+                }
+                resumen.append(" Ver FALTANTES.txt.");
+                progresoWeb.accept(resumen.toString());
             }
             return pathBase;
 
