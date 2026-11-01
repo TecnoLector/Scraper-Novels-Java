@@ -45,12 +45,41 @@ public class Scraper {
         String os = System.getProperty("os.name").toLowerCase();
         String driverPath = "";
 
-        if (os.contains("win")) {
+        boolean esWindows = os.contains("win");
+        if (esWindows) {
             driverPath = props.getProperty("webdriver.chrome.path.windows", "drivers/chromedriver.exe");
         } else if (os.contains("nix") || os.contains("nux") || os.contains("aix")) {
             driverPath = props.getProperty("webdriver.chrome.path.linux", "drivers/chromedriver-linux");
         }
-        System.setProperty("webdriver.chrome.driver", driverPath);
+
+        // Preferir el chromedriver LOCAL. Se prueban varias rutas porque el directorio de
+        // trabajo cambia según cómo se arranque (repo raíz vs. carpeta del módulo).
+        String relativo = esWindows ? "drivers/chromedriver.exe" : "drivers/chromedriver-linux";
+        java.util.List<String> candidatos = new java.util.ArrayList<>();
+        if (driverPath != null && !driverPath.isBlank()) {
+            candidatos.add(driverPath);
+        }
+        candidatos.add(relativo);                    // CWD = mi-extractor/
+        candidatos.add("mi-extractor/" + relativo);  // CWD = raíz del repo
+
+        String driverLocal = null;
+        for (String c : candidatos) {
+            if (new java.io.File(c).exists()) {
+                driverLocal = new java.io.File(c).getAbsolutePath();
+                break;
+            }
+        }
+
+        if (driverLocal != null) {
+            // Ya hay un driver local: usarlo tal cual, sin descargar nada.
+            System.setProperty("webdriver.chrome.driver", driverLocal);
+            System.out.println("Usando chromedriver local: " + driverLocal);
+        } else {
+            // No hay driver local: que Selenium Manager lo descargue UNA vez y lo cachee
+            // (~/.cache/selenium) para reutilizarlo en los siguientes arranques.
+            System.clearProperty("webdriver.chrome.driver");
+            System.out.println("No se encontró chromedriver local; Selenium Manager lo descargará una vez y lo reutilizará.");
+        }
         ChromeOptions options = new ChromeOptions();
 
         options.setPageLoadStrategy(PageLoadStrategy.EAGER);
@@ -70,7 +99,6 @@ public class Scraper {
         options.addArguments("--no-sandbox");
         options.addArguments("--disable-dev-shm-usage");
         options.addArguments("--disable-extensions");
-        options.addArguments("--memory-pressure-thresholds-mb=50");
 
         this.driver = new ChromeDriver(options);
         this.wait = new WebDriverWait(driver, Duration.ofSeconds(10));

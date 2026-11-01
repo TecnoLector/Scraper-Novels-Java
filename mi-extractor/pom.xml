@@ -28,6 +28,9 @@
 	</scm>
 	<properties>
 		<java.version>21</java.version>
+		<!-- Alinea TODOS los modulos de Selenium (BOM de Spring Boot) a una sola version
+		     compatible con Chrome 156; evita la mezcla 4.22/4.31 anterior. -->
+		<selenium.version>4.52.0</selenium.version>
 	</properties>
 	<dependencies>
 
@@ -64,7 +67,7 @@
     <dependency>
         <groupId>org.seleniumhq.selenium</groupId>
         <artifactId>selenium-java</artifactId>
-        <version>4.22.0</version>
+        <version>${selenium.version}</version>
     </dependency>
 
 	<dependency>
