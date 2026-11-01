@@ -407,7 +407,55 @@ public class MenuExtractor {
         }
     }
 
-    private static double extraerNumeroDeTitulo(String titulo) {
+    /**
+     * Filtra los capítulos según la opción del menú. Lógica pura (sin Selenium ni I/O),
+     * extraída de {@code descargarWebMultiHilo} para poder testearla.
+     *
+     * <ul>
+     *   <li>1: todos; 2: hasta {@code limite} (si {@code >0}); 3: solo el capítulo {@code limite};
+     *   4: rango {@code [inicio, fin]}; 5: lista CSV en {@code listaStr}.</li>
+     * </ul>
+     */
+    static Map<Double, String> filtrarCapitulos(Map<Double, String> todosLosCapitulos, int opcion,
+            int limite, int inicio, int fin, String listaStr) {
+        Map<Double, String> filtrados = new HashMap<>();
+        if (todosLosCapitulos == null) {
+            return filtrados;
+        }
+        switch (opcion) {
+            case 1:
+            case 2:
+                int max = (opcion == 2 && limite > 0) ? limite : Integer.MAX_VALUE;
+                for (Double k : todosLosCapitulos.keySet())
+                    if (k <= max)
+                        filtrados.put(k, todosLosCapitulos.get(k));
+                break;
+            case 4:
+                for (Double k : todosLosCapitulos.keySet())
+                    if (k >= inicio && k <= fin)
+                        filtrados.put(k, todosLosCapitulos.get(k));
+                break;
+            case 5:
+                String[] nums = (listaStr != null) ? listaStr.split(",") : new String[0];
+                for (String n : nums) {
+                    try {
+                        double nb = Double.parseDouble(n.trim());
+                        if (todosLosCapitulos.containsKey(nb))
+                            filtrados.put(nb, todosLosCapitulos.get(nb));
+                    } catch (Exception e) {
+                    }
+                }
+                break;
+            case 3:
+                double dLimite = (double) limite;
+                if (todosLosCapitulos.containsKey(dLimite))
+                    filtrados.put(dLimite, todosLosCapitulos.get(dLimite));
+                break;
+        }
+        return filtrados;
+    }
+
+    static double extraerNumeroDeTitulo(String titulo) {
         if (titulo == null)
             return 0.0;
         Pattern pattern = Pattern.compile("\\d+(\\.\\d+)?");
@@ -644,39 +692,9 @@ public class MenuExtractor {
 
             progresoWeb.accept("15% - 🔍 Analizando índice de la novela...");
             Map<Double, String> todosLosCapitulos = obtenerTodosLosCapitulos(url);
-            Map<Double, String> filtrados = new HashMap<>();
 
-            // FILTRADO DE CAPÍTULOS (Lógica de Menú)
-            switch (opcion) {
-                case 1:
-                case 2:
-                    int max = (opcion == 2 && limite > 0) ? limite : Integer.MAX_VALUE;
-                    for (Double k : todosLosCapitulos.keySet())
-                        if (k <= max)
-                            filtrados.put(k, todosLosCapitulos.get(k));
-                    break;
-                case 4:
-                    for (Double k : todosLosCapitulos.keySet())
-                        if (k >= inicio && k <= fin)
-                            filtrados.put(k, todosLosCapitulos.get(k));
-                    break;
-                case 5:
-                    String[] nums = listaStr.split(",");
-                    for (String n : nums) {
-                        try {
-                            double nb = Double.parseDouble(n.trim());
-                            if (todosLosCapitulos.containsKey(nb))
-                                filtrados.put(nb, todosLosCapitulos.get(nb));
-                        } catch (Exception e) {
-                        }
-                    }
-                    break;
-                case 3:
-                    double dLimite = (double) limite;
-                    if (todosLosCapitulos.containsKey(dLimite))
-                        filtrados.put(dLimite, todosLosCapitulos.get(dLimite));
-                    break;
-            }
+            // FILTRADO DE CAPÍTULOS (Lógica de Menú) — lógica pura extraída y testeable.
+            Map<Double, String> filtrados = filtrarCapitulos(todosLosCapitulos, opcion, limite, inicio, fin, listaStr);
 
             if (filtrados.isEmpty()) {
                 progresoWeb.accept("ERROR: ❌ No se encontraron capítulos.");
