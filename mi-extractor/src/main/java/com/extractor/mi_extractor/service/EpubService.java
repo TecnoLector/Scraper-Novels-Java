@@ -163,7 +163,8 @@ public class EpubService {
                 if (carpetaResultante != null) {
                     jobService.actualizarMensaje(id, "98% - Comprimiendo resultado...");
 
-                    Path zipFinal = storage.crearCarpetaTemporal("final_").resolve("Novela_" + id.substring(0, 5) + ".zip");
+                    String nombreNovela = nombreNovelaDesdeUrl(url, id);
+                    Path zipFinal = storage.crearCarpetaTemporal("final_").resolve(nombreNovela + ".zip");
                     zipProcessor.empaquetarEnZipEstandar(carpetaResultante, zipFinal);
 
                     jobService.setResultado(id, zipFinal);
@@ -174,5 +175,51 @@ public class EpubService {
                 log.error("Fallo en la extracción web del trabajo {}", id, e);
             }
         });
+    }
+
+    /**
+     * Deriva un nombre de novela a partir de la URL (el /scrape web no recibe nombre, a
+     * diferencia del CLI). Toma el último segmento con letras del path (el slug de SkyNovels),
+     * cambia '-'/'_' por espacios y capitaliza cada palabra. Si no hay slug usable, cae a
+     * "Novela_&lt;id&gt;". Además limpia caracteres no válidos para un nombre de archivo.
+     */
+    static String nombreNovelaDesdeUrl(String url, String id) {
+        String fallback = "Novela_" + id.substring(0, Math.min(5, id.length()));
+        try {
+            String path = java.net.URI.create(url).getPath();
+            if (path == null) {
+                return fallback;
+            }
+            String slug = null;
+            String[] segs = path.split("/");
+            for (int i = segs.length - 1; i >= 0; i--) {
+                String s = segs[i].trim();
+                if (!s.isEmpty() && !s.matches("\\d+") && s.matches(".*[a-zA-Z].*")) {
+                    slug = s;
+                    break;
+                }
+            }
+            if (slug == null) {
+                return fallback;
+            }
+            String nombre = slug.replace('-', ' ').replace('_', ' ').trim();
+            StringBuilder sb = new StringBuilder(nombre.length());
+            boolean inicioPalabra = true;
+            for (char c : nombre.toCharArray()) {
+                if (c == ' ') {
+                    inicioPalabra = true;
+                    sb.append(c);
+                } else if (inicioPalabra) {
+                    sb.append(Character.toUpperCase(c));
+                    inicioPalabra = false;
+                } else {
+                    sb.append(c);
+                }
+            }
+            String limpio = sb.toString().replaceAll("[\\\\/:*?\"<>|]", "").trim();
+            return limpio.isEmpty() ? fallback : limpio;
+        } catch (Exception e) {
+            return fallback;
+        }
     }
 }

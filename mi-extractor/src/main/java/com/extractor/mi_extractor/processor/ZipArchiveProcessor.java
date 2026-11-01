@@ -99,21 +99,33 @@ public class ZipArchiveProcessor {
     }
 
     public void empaquetarEnZipEstandar(Path carpetaFuente, Path archivoZipDestino) throws IOException {
-        try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(archivoZipDestino.toFile()))) {
-            Files.walk(carpetaFuente)
-                 .filter(Files::isRegularFile)
-                 .forEach(path -> {
-                     try {
-                         String rutaLimpia = carpetaFuente.relativize(path).toString().replace("\\", "/");
+        try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(archivoZipDestino.toFile()));
+             Stream<Path> paths = Files.walk(carpetaFuente)) {
+            paths.forEach(path -> {
+                try {
+                    if (path.equals(carpetaFuente)) {
+                        return; // la raíz no se añade como entrada
+                    }
+                    String rutaLimpia = carpetaFuente.relativize(path).toString().replace("\\", "/");
 
-                         ZipEntry zipEntry = new ZipEntry(rutaLimpia);
-                         zos.putNextEntry(zipEntry);
-                         Files.copy(path, zos);
-                         zos.closeEntry();
-                     } catch (IOException e) {
-                        log.warn("Error comprimiendo: {}", e.getMessage());
-                     }
-                 });
+                    if (Files.isDirectory(path)) {
+                        // Entrada de directorio: preserva carpetas (incluidas las VACÍAS como
+                        // META-INF y OEBPS/Images) para que el zip coincida con la estructura
+                        // que deja el CLI en disco.
+                        if (!rutaLimpia.endsWith("/")) {
+                            rutaLimpia = rutaLimpia + "/";
+                        }
+                        zos.putNextEntry(new ZipEntry(rutaLimpia));
+                        zos.closeEntry();
+                    } else {
+                        zos.putNextEntry(new ZipEntry(rutaLimpia));
+                        Files.copy(path, zos);
+                        zos.closeEntry();
+                    }
+                } catch (IOException e) {
+                    log.warn("Error comprimiendo: {}", e.getMessage());
+                }
+            });
         }
     }
 
