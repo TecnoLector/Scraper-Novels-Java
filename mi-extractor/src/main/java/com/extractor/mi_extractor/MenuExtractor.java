@@ -588,9 +588,9 @@ public class MenuExtractor {
                             }
                         }
 
-                        // Si tras los reintentos no se logró, anotamos el error.
+                        // Si tras los reintentos no se logró, anotamos el error (con la URL para diagnosticar).
                         if (!exito) {
-                            System.err.println("X Cap #" + numCap + " no se pudo bajar tras 3 intentos (queda en faltantes).");
+                            System.err.println("X Cap #" + numCap + " no se pudo bajar tras 3 intentos: " + urlCap);
                             capitulosFallidos.add(numCap);
                         }
                         capitulosDescargadosPorEsteHilo++;
