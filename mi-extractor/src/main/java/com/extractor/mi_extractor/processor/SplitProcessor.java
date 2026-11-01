@@ -19,6 +19,8 @@ import java.util.zip.ZipOutputStream;
 @Component
 public class SplitProcessor {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SplitProcessor.class);
+
     private final ZipArchiveProcessor zipProcessor;
     private final StorageService storage;
 
@@ -60,7 +62,7 @@ public class SplitProcessor {
             estados.put(id, "LISTO");
         } catch (Exception e) {
             estados.put(id, "ERROR fatal: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Error dividiendo EPUB (id={})", id, e);
         }
     }
 
@@ -143,9 +145,9 @@ public class SplitProcessor {
             libroDividido.getResources().add(newCoverResource);
             // Establecerlo como portada
             libroDividido.setCoverImage(newCoverResource);
-            System.out.println(" -> Portada copiada.");
+            log.debug("Portada copiada.");
         } else {
-            System.out.println(" -> Advertencia: EPUB original sin portada definida.");
+            log.debug("EPUB original sin portada definida.");
         }
 
         Spine spineOriginal = libroOriginal.getSpine();
@@ -159,10 +161,9 @@ public class SplitProcessor {
                     Resource newRes = new Resource(data, res.getHref());
                     newRes.setMediaType(res.getMediaType());
                     libroDividido.getResources().add(newRes);
-                    System.out.println(" -> Recurso copiado: " + res.getHref());
+                    log.debug("Recurso copiado: {}", res.getHref());
                 } catch (Exception e) {
-                    System.err.println(
-                            "Advertencia: No se pudo copiar el recurso " + res.getHref() + ": " + e.getMessage());
+                    log.warn("No se pudo copiar el recurso {}: {}", res.getHref(), e.getMessage());
                 }
             }
         }
@@ -176,7 +177,7 @@ public class SplitProcessor {
         paginaMetaResource.setMediaType(MediaTypes.XHTML);
         libroDividido.getResources().add(paginaMetaResource);
         libroDividido.addSection("Información del Libro", paginaMetaResource);
-        System.out.println(" -> Página de metadatos generada.");
+        log.debug("Página de metadatos generada.");
 
         List<Resource> spineResourcesOriginal = libroOriginal.getSpine().getSpineReferences().stream()
                 .map(ref -> ref.getResource())
@@ -201,18 +202,18 @@ public class SplitProcessor {
                 libroDividido.addSection(tituloSeccion, newContentResource);
 
             } else {
-                System.err.println("Advertencia: Índice fuera de rango al intentar añadir sección " + (i + 1));
+                log.warn("Índice fuera de rango al intentar añadir sección {}", (i + 1));
             }
         }
-        System.out.println(" -> Añadidas " + (endIndex - startIndex + 1) + " secciones de contenido.");
+        log.debug("Añadidas {} secciones de contenido.", (endIndex - startIndex + 1));
 
-        System.out.println(" -> Escribiendo EPUB en disco...");
+        log.debug("Escribiendo EPUB en disco...");
         EpubWriter epubWriter = new EpubWriter();
         try (FileOutputStream fos = new FileOutputStream(rutaDestino.toFile())) {
             epubWriter.write(libroDividido, fos);
         }
         
-        System.out.println(" -> ¡Archivo liberado y guardado con éxito!");
+        log.info("EPUB dividido guardado con éxito.");
     }
     
 

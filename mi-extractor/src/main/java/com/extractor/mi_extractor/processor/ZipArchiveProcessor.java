@@ -15,6 +15,8 @@ import java.util.zip.ZipOutputStream;
 @Component
 public class ZipArchiveProcessor {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ZipArchiveProcessor.class);
+
     private final StorageService storage;
 
     public ZipArchiveProcessor(StorageService storage) {
@@ -85,7 +87,7 @@ public class ZipArchiveProcessor {
                                  Files.copy(path, zos);
                                  zos.closeEntry();
                              } catch (IOException e) {
-                                 System.err.println("Error al añadir archivo: " + e.getMessage());
+                                 log.warn("Error al añadir archivo: {}", e.getMessage());
                              }
                          });
                 }
@@ -109,7 +111,7 @@ public class ZipArchiveProcessor {
                          Files.copy(path, zos);
                          zos.closeEntry();
                      } catch (IOException e) {
-                        System.err.println("Error comprimiendo: " + e.getMessage());
+                        log.warn("Error comprimiendo: {}", e.getMessage());
                      }
                  });
         }

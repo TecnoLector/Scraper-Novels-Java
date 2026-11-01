@@ -25,6 +25,8 @@ import java.util.logging.Logger;
 import org.openqa.selenium.PageLoadStrategy;
 
 public class Scraper {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(Scraper.class);
+
     private WebDriver driver;
     private WebDriverWait wait;
     private JavascriptExecutor js;
@@ -40,7 +42,7 @@ public class Scraper {
                 props.load(input);
             }
         } catch (Exception e) {
-            System.err.println("Error cargando application.properties: " + e.getMessage());
+            log.warn("Error cargando application.properties: " + e.getMessage());
         }
         String os = System.getProperty("os.name").toLowerCase();
         String driverPath = "";
@@ -73,12 +75,12 @@ public class Scraper {
         if (driverLocal != null) {
             // Ya hay un driver local: usarlo tal cual, sin descargar nada.
             System.setProperty("webdriver.chrome.driver", driverLocal);
-            System.out.println("Usando chromedriver local: " + driverLocal);
+            log.info("Usando chromedriver local: " + driverLocal);
         } else {
             // No hay driver local: que Selenium Manager lo descargue UNA vez y lo cachee
             // (~/.cache/selenium) para reutilizarlo en los siguientes arranques.
             System.clearProperty("webdriver.chrome.driver");
-            System.out.println("No se encontró chromedriver local; Selenium Manager lo descargará una vez y lo reutilizará.");
+            log.info("No se encontró chromedriver local; Selenium Manager lo descargará una vez y lo reutilizará.");
         }
         ChromeOptions options = new ChromeOptions();
 
@@ -110,7 +112,7 @@ public class Scraper {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             if (this.driver != null) {
                 try {
-                    System.out.println("Limpiando procesos huérfanos de Chromee...");
+                    log.info("Limpiando procesos huérfanos de Chromee...");
                     this.driver.quit();
                 } catch (Exception e) {
                     // Ignorar errores durante el apagado de emergencia
@@ -126,7 +128,7 @@ public class Scraper {
     public void navegarA(String url) {
         this.configActual = GestorSitios.obtenerConfig(url);
         if (this.configActual == null) {
-            System.err.println("ADVERTENCIA: No se encontró una configuración para esta URL.");
+            log.warn("ADVERTENCIA: No se encontró una configuración para esta URL.");
         }
         driver.get(url);
     }
@@ -188,22 +190,22 @@ public class Scraper {
                 WebElement pestana = waitBreve.until(ExpectedConditions.elementToBeClickable(By.xpath(xPathContenido)));
 
                 if (pestana != null) {
-                    System.out.println("Pestaña 'Contenido' detectada. Haciendo clic...");
+                    log.info("Pestaña 'Contenido' detectada. Haciendo clic...");
                     js.executeScript("arguments[0].click();", pestana);
                     Thread.sleep(2000);
                 }
             } catch (Exception e) {
-                System.out.println("Nota: No se necesitó cambiar de pestaña o ya estaba activa.");
+                log.info("Nota: No se necesitó cambiar de pestaña o ya estaba activa.");
             }
             
-            System.out.println("Esperando estructura de capítulos...");
+            log.info("Esperando estructura de capítulos...");
             String selectorLista = configActual.getSelectorContenedorIndice();
             wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(selectorLista)));
             
             // --- LÓGICA ESPECIAL SKYNOVELS (TURBO JAVASCRIPT) ---
             if (driver.getCurrentUrl().contains("skynovels.net")) {
                 esSkyNovels = true;
-                System.out.println("Modo SkyNovels: Extracción asíncrona iniciada...");
+                log.info("Modo SkyNovels: Extracción asíncrona iniciada...");
 
                 // IMPORTANTE: Le damos permiso a Selenium de esperar la respuesta asíncrona
                 driver.manage().timeouts().scriptTimeout(Duration.ofSeconds(60));
@@ -244,7 +246,7 @@ public class Scraper {
                 java.util.List<WebElement> paneles = driver.findElements(By.cssSelector("mat-expansion-panel-header"));
                 
                 if (!paneles.isEmpty()) {
-                    System.out.println("\n Se detectaron " + paneles.size() + " volúmenes. Analizando a velocidad extrema...");
+                    log.info("\n Se detectaron " + paneles.size() + " volúmenes. Analizando a velocidad extrema...");
                     for (int i = 0; i < paneles.size(); i++) {
                         paneles = driver.findElements(By.cssSelector("mat-expansion-panel-header"));
                         if (i >= paneles.size()) break;
@@ -259,7 +261,7 @@ public class Scraper {
                             Thread.sleep(600); // Dar 0.6s para que Angular abra el panel
                         }
                         
-                        System.out.print(" -> Ecaneando Volumen " + (i + 1) + "...");
+                        log.info(" -> Ecaneando Volumen " + (i + 1) + "...");
                         
                         // Aquí llamamos al Turbo Script y Java espera pacientemente (en milisegundos)
                         @SuppressWarnings("unchecked")
@@ -267,7 +269,7 @@ public class Scraper {
                         
                         if (enlacesExtraidosJS != null) {
                             enlacesGuardados.addAll(enlacesExtraidosJS);
-                            System.out.println("\n  -> En memoria: " + enlacesGuardados.size());
+                            log.info("\n  -> En memoria: " + enlacesGuardados.size());
                         }
 
                         // Colapsar el volumen ya procesado para liberar su DOM (memoria)
@@ -280,13 +282,13 @@ public class Scraper {
                         }
                     }
                 } else {
-                    System.out.println("No se detectaron volúmenes agrupados. Extrayendo lista general con Turbo...");
+                    log.info("No se detectaron volúmenes agrupados. Extrayendo lista general con Turbo...");
                     @SuppressWarnings("unchecked")
                     java.util.List<String> enlacesExtraidosJS = (java.util.List<String>) js.executeAsyncScript(jsTurbo);
                     if (enlacesExtraidosJS != null) enlacesGuardados.addAll(enlacesExtraidosJS);
                 }
                 
-                System.out.println("\n ¡Escaneo completo! Total de capítulos capturados en memoria: " + enlacesGuardados.size());
+                log.info("\n ¡Escaneo completo! Total de capítulos capturados en memoria: " + enlacesGuardados.size());
 
                 // Creamos el HTML "limpio" y perfecto para que Jsoup no se confunda
                 return reconstruirDomDesdeEnlaces(enlacesGuardados);
@@ -296,7 +298,7 @@ public class Scraper {
                 try {
                     java.util.List<WebElement> paneles = driver.findElements(By.cssSelector("mat-expansion-panel-header"));
                     if (!paneles.isEmpty()) {
-                        System.out.println("Se detectaron " + paneles.size() + " volúmenes. Abriendo todos...");
+                        log.info("Se detectaron " + paneles.size() + " volúmenes. Abriendo todos...");
                         for (WebElement panel : paneles) {
                             js.executeScript("arguments[0].click();", panel);
                             Thread.sleep(500); 
@@ -304,25 +306,25 @@ public class Scraper {
                     }
                 } catch (Exception e) {}
 
-                System.out.println("Cargando página completa...");
+                log.info("Cargando página completa...");
                 js.executeScript("window.scrollTo(0, document.body.scrollHeight);");
                 Thread.sleep(1500);
-                System.out.println("Scroll finalizado. Extrayendo código fuente...");
+                log.info("Scroll finalizado. Extrayendo código fuente...");
                 return driver.getPageSource();
             }
 
         } catch (Exception e) {
-            System.err.println("Advertencia obteniendo índice: " + e.getMessage());
+            log.warn("Advertencia obteniendo índice: " + e.getMessage());
             // Si es SkyNovels y ya capturamos enlaces, salvarlos en vez de petar con un navegador muerto.
             if (esSkyNovels && !enlacesGuardados.isEmpty()) {
-                System.out.println("Salvando " + enlacesGuardados.size() + " capítulos capturados antes del fallo.");
+                log.info("Salvando " + enlacesGuardados.size() + " capítulos capturados antes del fallo.");
                 return reconstruirDomDesdeEnlaces(enlacesGuardados);
             }
             // Último recurso: intentar el HTML, pero sin que un navegador muerto vuelva a petar.
             try {
                 return driver.getPageSource();
             } catch (Exception e2) {
-                System.err.println("No se pudo obtener el HTML tras el fallo: " + e2.getMessage());
+                log.warn("No se pudo obtener el HTML tras el fallo: " + e2.getMessage());
                 return "<!DOCTYPE html><html><body></body></html>";
             }
         }
@@ -348,7 +350,7 @@ public class Scraper {
         try {
             // 1. MANIOBRA ESPECIAL PARA SKYNOVELS
             if (driver.getCurrentUrl().contains("skynovels.net")) {
-                System.out.println("⚡ Detectado SkyNovels. Abriendo menús...");
+                log.info("⚡ Detectado SkyNovels. Abriendo menús...");
                 Thread.sleep(2000); // Esperar a que cargue la web
 
                 // A. Intentar clic en la pestaña "Contenido" (Actualizado para el nuevo Angular)
@@ -363,14 +365,14 @@ public class Scraper {
                         }
                     }
                 } catch (Exception e) {
-                    System.out.println("   -> No se pudo hacer clic en Contenido: " + e.getMessage());
+                    log.info("   -> No se pudo hacer clic en Contenido: " + e.getMessage());
                 }
 
                 // B. Abrir los acordeones (Paneles de Volúmenes)
                 try {
                     List<WebElement> paneles = driver.findElements(By.cssSelector("mat-expansion-panel-header"));
                     if (!paneles.isEmpty()) {
-                        System.out.println("   -> Desplegando " + paneles.size() + " volúmenes...");
+                        log.info("   -> Desplegando " + paneles.size() + " volúmenes...");
                         for (WebElement panel : paneles) {
                             js.executeScript("arguments[0].click();", panel);
                             Thread.sleep(200); // Un poco más de tiempo para que Angular anime el panel
@@ -379,12 +381,12 @@ public class Scraper {
                 } catch (Exception e) {
                 }
 
-                System.out.println("   -> Esperando a que aparezcan los enlaces...");
+                log.info("   -> Esperando a que aparezcan los enlaces...");
                 Thread.sleep(2000);
             }
 
             // 2. EXTRACCIÓN DE ENLACES (Scroll Incremental para vencer a Angular)
-            System.out.println("🔍 Buscando capítulos en la página con Scroll Incremental...");
+            log.info("🔍 Buscando capítulos en la página con Scroll Incremental...");
 
             long lastScrollPosition = 0;
             int maxIntentosSinNuevosEnlaces = 5;
@@ -425,10 +427,10 @@ public class Scraper {
                 lastScrollPosition = currentScrollPosition;
             }
 
-            System.out.println("✅ Total encontrados: " + enlaces.size());
+            log.info("✅ Total encontrados: " + enlaces.size());
 
         } catch (Exception e) {
-            System.out.println("Error extrayendo enlaces: " + e.getMessage());
+            log.info("Error extrayendo enlaces: " + e.getMessage());
         }
 
         return new ArrayList<>(enlaces);
@@ -523,7 +525,7 @@ public class Scraper {
             }
 
             if (botonClick != null) {
-                System.out.println("   -> Botón 'Siguiente' detectado. Avanzando...");
+                log.info("   -> Botón 'Siguiente' detectado. Avanzando...");
                 
                 String href = botonClick.getAttribute("href");
                 
@@ -551,24 +553,24 @@ public class Scraper {
                 return true;
                 
             } else {
-                System.out.println("   -> No se encontró botón 'Siguiente' válido. ¡Se alcanzó el final de la novela!");
+                log.info("   -> No se encontró botón 'Siguiente' válido. ¡Se alcanzó el final de la novela!");
                 return false;
             }
 
         } catch (Exception e) {
-            System.out.println("   -> Error al intentar avanzar: " + e.getMessage());
+            log.info("   -> Error al intentar avanzar: " + e.getMessage());
             return false;
         }
     }
 
     public void cerrar() {
         if (driver != null) {
-            System.out.println("Cerrando el navegador.");
+            log.info("Cerrando el navegador.");
             try {
                 driver.quit();
             } catch (Exception e) {
                 // El navegador ya pudo morir: ignorar para no dejar la limpieza a medias.
-                System.err.println("Aviso al cerrar el navegador: " + e.getMessage());
+                log.warn("Aviso al cerrar el navegador: " + e.getMessage());
             } finally {
                 driver = null; // evita un segundo quit sobre un driver ya cerrado
             }

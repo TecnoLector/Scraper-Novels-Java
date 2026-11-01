@@ -3,8 +3,13 @@ package com.extractor.mi_extractor;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class GestorSitios {
-    
+
+    private static final Logger log = LoggerFactory.getLogger(GestorSitios.class);
+
     private static final List<SitioWebConfig> SITIOS_REGISTRADOS = new ArrayList<>();
 
     static {
@@ -21,7 +26,7 @@ public class GestorSitios {
                 return sitio;
             }
         }
-        System.out.println("⚠️ Web no reconocida. Usando configuración por defecto.");
+        log.warn("Web no reconocida. Usando configuración por defecto.");
         return new SitioSkyNovels();
     }
 

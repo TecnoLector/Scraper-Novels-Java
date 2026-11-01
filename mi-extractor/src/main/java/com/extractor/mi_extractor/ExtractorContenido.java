@@ -11,7 +11,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class ExtractorContenido {
-    
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ExtractorContenido.class);
+
     private final String[] selectoresTituloCandidatos = {
         "h1[class*='title']", "h2[class*='title']", "h3.text-center",
         "p > strong","strong", "h1", "h2", "h3", "h4","b"
@@ -38,7 +40,7 @@ public class ExtractorContenido {
                     contenidoElement = doc.selectFirst(selCont);
                 }
             } catch (Exception e) { 
-                System.err.println("Selector de contenido inválido en config."); 
+                log.warn("Selector de contenido inválido en config.");
             }
 
             try {
@@ -47,7 +49,7 @@ public class ExtractorContenido {
                     tituloElement = doc.selectFirst(selTit);
                 }
             } catch (Exception e) { 
-                System.err.println("Selector de título inválido en config.");
+                log.warn("Selector de título inválido en config.");
             }
         }
 
@@ -103,7 +105,7 @@ public class ExtractorContenido {
             
             // VALIDACIÓN: Verificar que el contenido NO esté vacío
             if (contenidoHtml.trim().isEmpty()) {
-                System.err.println("ADVERTENCIA: El contenido extraído está vacío. Guardando HTML de error...");
+                log.warn("El contenido extraído está vacío. Guardando HTML de error...");
                 guardarHtmlDeError(html);
                 return null;
             }
@@ -112,10 +114,8 @@ public class ExtractorContenido {
         }
         
         // 🔍 DIAGNÓSTICO MEJORADO
-        System.err.println("Error: No se pudo extraer capítulo.");
-        if (tituloElement == null) System.err.println("   - Titulo NO encontrado");
-        if (contenidoElement == null) System.err.println("   - Contenido NO encontrado");
-        System.err.println("   Guardando HTML de error para diagnóstico...");
+        log.warn("No se pudo extraer capítulo (titulo encontrado={}, contenido encontrado={}). Guardando HTML de error para diagnóstico...",
+                tituloElement != null, contenidoElement != null);
         guardarHtmlDeError(html);
         return null;
     }
@@ -124,9 +124,9 @@ public class ExtractorContenido {
         try {
             String nombreArchivoDebug = "debug_pagina_fallida.html";
             Files.writeString(Paths.get(nombreArchivoDebug), html);
-            System.out.println("Se ha guardado el HTML de la página fallida en: " + nombreArchivoDebug);
+            log.info("HTML de la página fallida guardado en: {}", nombreArchivoDebug);
         } catch (IOException e) {
-            System.err.println("No se pudo guardar el archivo de depuración.");
+            log.warn("No se pudo guardar el archivo de depuración.");
         }
     }
 

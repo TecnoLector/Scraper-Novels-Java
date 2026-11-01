@@ -10,7 +10,12 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class IndiceExtractor {
+
+    private static final Logger log = LoggerFactory.getLogger(IndiceExtractor.class);
 
     public Map<Double, String> extraerEnlaces(String html, String urlIndice) {
         Map<Double, String> mapaCapitulos = new TreeMap<>();
@@ -26,9 +31,9 @@ public class IndiceExtractor {
             selectorLista = config.getSelectorElementoLista();
             selectorEnlace = config.getSelectorEnlaceCapitulo();
             selectorNumero = config.getSelectorNumeroCapitulo();
-            System.out.println("Usando estrategia: " + config.getNombreSitio());
+            log.debug("Usando estrategia: {}", config.getNombreSitio());
         } else {
-            System.out.println("Modo genérico activado.");
+            log.debug("Modo genérico activado.");
         }
 
         Elements elementosLista;
@@ -42,7 +47,7 @@ public class IndiceExtractor {
         } else {
             elementosLista = doc.select(selectorLista);
         }
-        System.out.println("Se encontraron " + elementosLista.size() + " elementos candidatos.");
+        log.debug("Se encontraron {} elementos candidatos.", elementosLista.size());
 
         for (Element elemento : elementosLista) {
             try {
@@ -120,7 +125,7 @@ public class IndiceExtractor {
             }
         }
 
-        System.out.println("Se procesaron " + mapaCapitulos.size() + " enlaces a capítulos con éxito.");
+        log.info("Se procesaron {} enlaces a capítulos con éxito.", mapaCapitulos.size());
         return mapaCapitulos;
     }
 

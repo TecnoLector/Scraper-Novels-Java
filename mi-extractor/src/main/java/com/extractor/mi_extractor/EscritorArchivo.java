@@ -5,7 +5,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class EscritorArchivo {
+
+    private static final Logger log = LoggerFactory.getLogger(EscritorArchivo.class);
 
     public void guardarCapitulo(Capitulo capitulo, String rutaDeGuardadoBase, double numeroCapitulo) throws IOException {
         String titulo = capitulo.getTitulo();
@@ -30,7 +35,7 @@ public class EscritorArchivo {
         // Usamos la plantilla XHTML correcta (EPUB 2)
         String plantillaXHTML = construirPlantillaXHTML(titulo, contenidoHtml);
         Files.writeString(rutaCompleta, plantillaXHTML);
-        System.out.println(" ¡Éxito! Guardado como: " + rutaCompleta.toString());
+        log.info("Guardado: {}", rutaCompleta);
     }
 
     // --- PLANTILLA XHTML PARA EPUB 3 (HTML5) ---

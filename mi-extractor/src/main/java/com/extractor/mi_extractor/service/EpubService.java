@@ -20,6 +20,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class EpubService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(EpubService.class);
+
     private final StorageService storage;
     private final CalibreProcessor calibre;
     private final SplitProcessor splitProcessor;
@@ -127,6 +129,7 @@ public class EpubService {
                 }
             } catch (Exception e) {
                 estados.put(id, "ERROR_SISTEMA");
+                log.error("Fallo procesando el trabajo {} (accion={})", id, accion, e);
             }
         }).start();
     }
@@ -186,7 +189,7 @@ public class EpubService {
                 }
             } catch (Exception e) {
                 estados.put(id, "ERROR: " + e.getMessage());
-                e.printStackTrace();
+                log.error("Fallo en la extracción web del trabajo {}", id, e);
             }
         });
     }
