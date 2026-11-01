@@ -416,6 +416,37 @@ public class MenuExtractor {
      *   4: rango {@code [inicio, fin]}; 5: lista CSV en {@code listaStr}.</li>
      * </ul>
      */
+    /** Escribe FALTANTES.txt en la raíz de la salida con los capítulos que no se pudieron bajar. */
+    private static void escribirFaltantes(java.nio.file.Path pathBase, java.util.Set<Double> faltantes) {
+        try {
+            String contenido = "Capitulos que NO se pudieron descargar (" + faltantes.size() + "):\n"
+                    + formatearListaCaps(faltantes) + "\n";
+            java.nio.file.Files.writeString(pathBase.resolve("FALTANTES.txt"), contenido);
+        } catch (Exception e) {
+            System.err.println("No se pudo escribir FALTANTES.txt: " + e.getMessage());
+        }
+    }
+
+    /** Une los números de capítulo exactos (decimales incluidos) separados por coma. */
+    static String formatearListaCaps(java.util.Collection<Double> caps) {
+        StringBuilder sb = new StringBuilder();
+        for (Double cap : caps) {
+            if (sb.length() > 0) {
+                sb.append(", ");
+            }
+            sb.append(formatearNumeroCap(cap));
+        }
+        return sb.toString();
+    }
+
+    /** Muestra 15 (entero) o 15.1 (decimal); NUNCA inventa un entero a partir de un decimal. */
+    static String formatearNumeroCap(double cap) {
+        if (cap == Math.floor(cap) && !Double.isInfinite(cap)) {
+            return String.valueOf((long) cap);
+        }
+        return String.valueOf(cap);
+    }
+
     static Map<Double, String> filtrarCapitulos(Map<Double, String> todosLosCapitulos, int opcion,
             int limite, int inicio, int fin, String listaStr) {
         Map<Double, String> filtrados = new HashMap<>();
@@ -633,6 +664,7 @@ public class MenuExtractor {
     String urlActual = urlPortada;
     int pagina = 1;
 
+    try {
     while (urlActual != null) {
         System.out.println(">>> Analizando índice - Página " + pagina + "...");
         scraper.navegarA(urlActual);
@@ -669,8 +701,9 @@ public class MenuExtractor {
             urlActual = null;
         }
     }
-
-    scraper.cerrar();
+    } finally {
+        scraper.cerrar(); // SIEMPRE cerrar, aunque el navegador haya muerto a mitad del índice.
+    }
     return mapaTotal;
 }
 
@@ -710,6 +743,8 @@ public class MenuExtractor {
             String[] msgHilos = new String[numHilosEfectivos];
             int[] pctHilos = new int[numHilosEfectivos];
             AtomicInteger globales = new AtomicInteger(0);
+            // Capítulos planificados que NO se llegaron a guardar (números exactos, decimales incluidos).
+            java.util.Set<Double> faltantes = new java.util.concurrent.ConcurrentSkipListSet<>();
             for (int i = 0; i < numHilosEfectivos; i++) {
                 msgHilos[i] = "Iniciando...";
                 pctHilos[i] = 0;
@@ -753,10 +788,21 @@ public class MenuExtractor {
                             pctHilos[idH] = (int) (((double) count / miLote.size()) * 100);
                             updateUI.run();
 
-                            sH.navegarA(filtrados.get(nCap));
-                            Capitulo c = eH.extraer(sH.obtenerHtmlDePagina(), sH.getConfig());
-                            if (c != null)
-                                wH.guardarCapitulo(c, rutaBaseStr, nCap);
+                            // Resiliencia por capítulo: un fallo NO debe abandonar el resto del lote.
+                            try {
+                                sH.navegarA(filtrados.get(nCap));
+                                Capitulo c = eH.extraer(sH.obtenerHtmlDePagina(), sH.getConfig());
+                                if (c != null) {
+                                    wH.guardarCapitulo(c, rutaBaseStr, nCap);
+                                } else {
+                                    faltantes.add(nCap); // sin contenido
+                                }
+                            } catch (Exception capEx) {
+                                faltantes.add(nCap);
+                                // El navegador pudo morir: recrearlo para seguir con el resto del lote.
+                                sH.cerrar();
+                                sH = new Scraper();
+                            }
 
                             count++;
                             globales.incrementAndGet();
@@ -775,6 +821,13 @@ public class MenuExtractor {
 
             executor.shutdown();
             executor.awaitTermination(5, TimeUnit.HOURS);
+
+            // Reporte de faltantes: capítulos planificados que no se guardaron (números exactos).
+            if (!faltantes.isEmpty()) {
+                escribirFaltantes(pathBase, faltantes);
+                progresoWeb.accept("95% - Completado con " + faltantes.size()
+                        + " capítulos sin bajar (ver FALTANTES.txt): " + formatearListaCaps(faltantes));
+            }
             return pathBase;
 
         } catch (Exception e) {

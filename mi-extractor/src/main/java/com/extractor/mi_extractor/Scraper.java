@@ -529,7 +529,14 @@ public class Scraper {
     public void cerrar() {
         if (driver != null) {
             System.out.println("Cerrando el navegador.");
-            driver.quit();
+            try {
+                driver.quit();
+            } catch (Exception e) {
+                // El navegador ya pudo morir: ignorar para no dejar la limpieza a medias.
+                System.err.println("Aviso al cerrar el navegador: " + e.getMessage());
+            } finally {
+                driver = null; // evita un segundo quit sobre un driver ya cerrado
+            }
         }
     }
 }

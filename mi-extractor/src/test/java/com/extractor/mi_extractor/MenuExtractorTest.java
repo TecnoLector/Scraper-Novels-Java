@@ -79,4 +79,19 @@ class MenuExtractorTest {
     void mapaNullDevuelveVacio() {
         assertTrue(MenuExtractor.filtrarCapitulos(null, 1, 0, 0, 0, "").isEmpty());
     }
+
+    // --- formateo decimal-safe de capítulos (15.1/15.2 NUNCA se vuelven 16) ---
+
+    @Test
+    void formateaEnteroSinDecimalYDecimalTalCual() {
+        assertEquals("15", MenuExtractor.formatearNumeroCap(15.0));
+        assertEquals("15.1", MenuExtractor.formatearNumeroCap(15.1));
+        assertEquals("15.2", MenuExtractor.formatearNumeroCap(15.2));
+    }
+
+    @Test
+    void listaDeFaltantesConservaLosDecimales() {
+        java.util.Set<Double> caps = new java.util.TreeSet<>(java.util.List.of(15.1, 15.2, 16.0));
+        assertEquals("15.1, 15.2, 16", MenuExtractor.formatearListaCaps(caps));
+    }
 }
