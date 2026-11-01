@@ -16,13 +16,13 @@ public class CleanupTask {
     private static final Logger log = LoggerFactory.getLogger(CleanupTask.class);
 
     private final StorageService storage;
-    private final EpubService epubService;
+    private final JobService jobService;
     private final Duration ttl;
 
-    public CleanupTask(StorageService storage, EpubService epubService,
+    public CleanupTask(StorageService storage, JobService jobService,
             @Value("${app.storage.tmp-ttl-hours}") long ttlHoras) {
         this.storage = storage;
-        this.epubService = epubService;
+        this.jobService = jobService;
         this.ttl = Duration.ofHours(ttlHoras);
     }
 
@@ -31,7 +31,7 @@ public class CleanupTask {
         log.info("🧹 Barriendo temporales con antigüedad > {} h...", ttl.toHours());
         try {
             int carpetas = storage.limpiarTemporalesViejos(ttl);
-            int trabajos = epubService.purgarExpirados(ttl);
+            int trabajos = jobService.purgarExpirados(ttl);
             log.info("🧹 Limpieza completada: {} carpetas temporales y {} trabajos purgados.", carpetas, trabajos);
         } catch (Exception e) {
             log.warn("Fallo durante la limpieza de temporales: {}", e.getMessage(), e);

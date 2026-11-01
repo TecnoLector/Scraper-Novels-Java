@@ -11,8 +11,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -27,32 +25,34 @@ public class EpubService {
     private final SplitProcessor splitProcessor;
     private final ZipArchiveProcessor zipProcessor;
     private final InsertPageBookProcessor insertPageBookProcessor;
+    private final JobService jobService;
 
     public EpubService(StorageService storage, CalibreProcessor calibre, ZipArchiveProcessor zipProcessor,
-            SplitProcessor splitProcessor, InsertPageBookProcessor insertPageBookProcessor) {
+            SplitProcessor splitProcessor, InsertPageBookProcessor insertPageBookProcessor, JobService jobService) {
         this.storage = storage;
         this.calibre = calibre;
         this.zipProcessor = zipProcessor;
         this.splitProcessor = splitProcessor;
         this.insertPageBookProcessor = insertPageBookProcessor;
+        this.jobService = jobService;
     }
 
-    private final Map<String, String> estados = new ConcurrentHashMap<>();
-    private final Map<String, Path> archivosListos = new ConcurrentHashMap<>();
-    private final Map<String, Instant> creadoEn = new ConcurrentHashMap<>();
-
-    public String getEstado(String id) {
-        return estados.getOrDefault(id, "ESPERANDO...");
-    }
-
-    public Path getRutaFinal(String id) {
-        return archivosListos.get(id);
-    }
+    /**
+     * Puente para los processors (legado) que reportan progreso por un Map: cada put
+     * se enruta al JobService. Así no hay que cambiar sus firmas.
+     */
+    private final Map<String, String> puenteProgreso = new ConcurrentHashMap<>() {
+        @Override
+        public String put(String id, String mensaje) {
+            jobService.actualizarMensaje(id, mensaje);
+            return mensaje;
+        }
+    };
 
     public void iniciarProceso(String id, byte[] bytes, String nombre, String accion,
             Integer tipoDivision, Integer parametro, String sitio, String creador, List<String> nombresPaginas,
             List<Integer> capitulosAnteriores, MultipartFile[] folderFiles) {
-        creadoEn.put(id, Instant.now());
+        jobService.crear(id, accion);
         new Thread(() -> {
             try {
                 Path dir = storage.crearCarpetaTemporal("epub_");
@@ -68,20 +68,20 @@ public class EpubService {
                         String cread = (creador != null) ? creador : "";
 
                         splitProcessor.procesarDivision(id, input, outputSplit, nombre, tipoDiv, param, sit, cread,
-                                estados);
+                                puenteProgreso);
 
-                        archivosListos.put(id, outputSplit);
-                        estados.put(id, "LISTO");
+                        jobService.setResultado(id, outputSplit);
+                        jobService.actualizarMensaje(id, "LISTO");
                         break;
 
                     case "DESCOMPRIMIR":
                         Path outputZip = dir.resolve(nombre.replace(".epub", "_extraido.zip"));
-                        zipProcessor.descomprimirEpub(id, input, outputZip, estados);
-                        archivosListos.put(id, outputZip);
+                        zipProcessor.descomprimirEpub(id, input, outputZip, puenteProgreso);
+                        jobService.setResultado(id, outputZip);
                         break;
 
                     case "REEMPAQUETAR":
-                        estados.put(id, "Procesando archivo contenedor...");
+                        jobService.actualizarMensaje(id, "Procesando archivo contenedor...");
                         Path carpetaFuente = storage.crearCarpetaTemporal("repack_");
 
                         zipProcessor.descomprimirZip(input, carpetaFuente);
@@ -93,10 +93,10 @@ public class EpubService {
                                 : nombre;
                         Path epubSalida = rutaDescargas.resolve(nombreBase + "_reempaquetado.epub");
 
-                        zipProcessor.reempaquetarComoEpub(id, carpetaFuente, epubSalida, estados);
+                        zipProcessor.reempaquetarComoEpub(id, carpetaFuente, epubSalida, puenteProgreso);
 
                         storage.eliminarRecursivo(carpetaFuente);
-                        archivosListos.put(id, epubSalida);
+                        jobService.setResultado(id, epubSalida);
                         break;
 
                     case "INICIO_LIBRO":
@@ -110,62 +110,41 @@ public class EpubService {
                         String creadv = (creador != null) ? creador : "TecnoLector";
 
                         insertPageBookProcessor.insertarPaginasDeLibro(id, input, outputInicio, sitv, creadv,
-                                nombresPaginas, capitulosAnteriores, estados);
+                                nombresPaginas, capitulosAnteriores, puenteProgreso);
 
-                        archivosListos.put(id, outputInicio);
-                        estados.put(id, "LISTO");
+                        jobService.setResultado(id, outputInicio);
+                        jobService.actualizarMensaje(id, "LISTO");
                         break;
 
                     case "CONVERTIR_V3":
                         Path outputCalibre = dir.resolve(nombre.replace(".epub", "_v3.epub"));
-                        calibre.convertir(id, input, outputCalibre, estados);
-                        archivosListos.put(id, outputCalibre);
-                        estados.put(id, "LISTO");
+                        calibre.convertir(id, input, outputCalibre, puenteProgreso);
+                        jobService.setResultado(id, outputCalibre);
+                        jobService.actualizarMensaje(id, "LISTO");
                         break;
 
                     default:
-                        estados.put(id, "ERROR: Acción no reconocida.");
+                        jobService.actualizarMensaje(id, "ERROR: Acción no reconocida.");
                         break;
                 }
             } catch (Exception e) {
-                estados.put(id, "ERROR_SISTEMA");
+                jobService.actualizarMensaje(id, "ERROR_SISTEMA");
                 log.error("Fallo procesando el trabajo {} (accion={})", id, accion, e);
             }
         }).start();
     }
 
-    /**
-     * Elimina de los mapas de estado los trabajos cuya antiguedad supere el TTL,
-     * para evitar que {@code estados}/{@code archivosListos} crezcan sin limite.
-     *
-     * @return numero de trabajos purgados.
-     */
-    public int purgarExpirados(Duration ttl) {
-        Instant limite = Instant.now().minus(ttl);
-        int purgados = 0;
-        for (Map.Entry<String, Instant> entrada : creadoEn.entrySet()) {
-            if (entrada.getValue().isBefore(limite)) {
-                String id = entrada.getKey();
-                creadoEn.remove(id);
-                estados.remove(id);
-                archivosListos.remove(id);
-                purgados++;
-            }
-        }
-        return purgados;
-    }
-
     public void iniciarExtraccionWeb(String id, String url, Integer opcion, Integer hilos, Integer limite, Integer inicio, Integer fin, String lista) {
-        creadoEn.put(id, Instant.now());
-        estados.put(id, "5% - Inicializando motor multihilo...");
-        
+        jobService.crear(id, "SCRAPE");
+        jobService.actualizarMensaje(id, "5% - Inicializando motor multihilo...");
+
         CompletableFuture.runAsync(() -> {
             try {
                 Path rutaTemp = storage.crearCarpetaTemporal("extraccion_");
                 MenuExtractor extractor = new MenuExtractor();
-                
+
                 Path carpetaResultante = extractor.descargarWebMultiHilo(
-                    opcion, 
+                    opcion,
                     url,
                     hilos,
                     limite,
@@ -173,22 +152,22 @@ public class EpubService {
                     fin,
                     lista,
                     rutaTemp.toString(),
-                    (mensaje) -> {  
-                        estados.put(id, mensaje);
+                    (mensaje) -> {
+                        jobService.actualizarMensaje(id, mensaje);
                     }
                 );
-                
+
                 if (carpetaResultante != null) {
-                    estados.put(id, "98% - Comprimiendo resultado...");
-                    
-                    Path zipFinal = storage.crearCarpetaTemporal("final_").resolve("Novela_" + id.substring(0,5) + ".zip");
+                    jobService.actualizarMensaje(id, "98% - Comprimiendo resultado...");
+
+                    Path zipFinal = storage.crearCarpetaTemporal("final_").resolve("Novela_" + id.substring(0, 5) + ".zip");
                     zipProcessor.empaquetarEnZipEstandar(carpetaResultante, zipFinal);
-                    
-                    archivosListos.put(id, zipFinal);
-                    estados.put(id, "LISTO");
+
+                    jobService.setResultado(id, zipFinal);
+                    jobService.actualizarMensaje(id, "LISTO");
                 }
             } catch (Exception e) {
-                estados.put(id, "ERROR: " + e.getMessage());
+                jobService.actualizarMensaje(id, "ERROR: " + e.getMessage());
                 log.error("Fallo en la extracción web del trabajo {}", id, e);
             }
         });

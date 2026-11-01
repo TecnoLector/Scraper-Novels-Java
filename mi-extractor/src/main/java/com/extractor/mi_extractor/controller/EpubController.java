@@ -24,10 +24,13 @@ public class EpubController {
 
     private final EpubService epubService;
     private final UrlSafetyValidator urlSafetyValidator;
+    private final com.extractor.mi_extractor.service.JobService jobService;
 
-    public EpubController(EpubService epubService, UrlSafetyValidator urlSafetyValidator) {
+    public EpubController(EpubService epubService, UrlSafetyValidator urlSafetyValidator,
+            com.extractor.mi_extractor.service.JobService jobService) {
         this.epubService = epubService;
         this.urlSafetyValidator = urlSafetyValidator;
+        this.jobService = jobService;
     }
 
     @PostMapping("/upload")
@@ -54,12 +57,12 @@ public class EpubController {
 
     @GetMapping("/status/{id}")
     public String checkStatus(@PathVariable String id) {
-        return epubService.getEstado(id);
+        return jobService.getMensaje(id);
     }
 
     @GetMapping("/download/{id}")
     public ResponseEntity<Resource> download(@PathVariable String id) throws Exception {
-        Path path = epubService.getRutaFinal(id);
+        Path path = jobService.getResultado(id);
 
         if (path == null) {
             return ResponseEntity.notFound().build();
