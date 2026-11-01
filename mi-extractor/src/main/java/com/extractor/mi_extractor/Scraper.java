@@ -142,6 +142,9 @@ public class Scraper {
     }
 
     public String obtenerHtmlDeIndice() {
+        // Acumulador y bandera a nivel de método para poder SALVAR lo capturado si el navegador muere.
+        java.util.Set<String> enlacesGuardados = new java.util.LinkedHashSet<>();
+        boolean esSkyNovels = false;
         try {
             // 1. Intentar hacer clic en la pestaña "Contenido"
             try {
@@ -164,9 +167,9 @@ public class Scraper {
             
             // --- LÓGICA ESPECIAL SKYNOVELS (TURBO JAVASCRIPT) ---
             if (driver.getCurrentUrl().contains("skynovels.net")) {
+                esSkyNovels = true;
                 System.out.println("Modo SkyNovels: Extracción asíncrona iniciada...");
-                java.util.Set<String> enlacesGuardados = new java.util.LinkedHashSet<>();
-                
+
                 // IMPORTANTE: Le damos permiso a Selenium de esperar la respuesta asíncrona
                 driver.manage().timeouts().scriptTimeout(Duration.ofSeconds(60));
                 
@@ -178,7 +181,9 @@ public class Scraper {
                     "var scrollArea = document.querySelector('.mat-expansion-panel.mat-expanded .mat-expansion-panel-content, .cdk-virtual-scroll-viewport, .mat-expansion-panel-body') || document.scrollingElement || window;" +
                     "var intentos = 0;" +
                     "var lastScroll = -1;" +
+                    "var maxIter = 400; var iter = 0;" + // cinturón de seguridad: nunca scroll infinito
                     "var timer = setInterval(function() {" +
+                    "    iter++; if (iter > maxIter) { clearInterval(timer); callback(enlaces); return; }" +
                     "    var elementos = document.querySelectorAll(\"a[href*='/capitulo/'], a[href*='/novelas/'][href*='capitulo'], div.skn-nvl-chp-element a\");" +
                     "    elementos.forEach(function(el) {" +
                     "        if (el.href && el.href.includes('capitulo') && !urls.has(el.href)) {" +
@@ -199,7 +204,7 @@ public class Scraper {
                     "        intentos = 0;" +
                     "        lastScroll = currentScroll;" +
                     "    }" +
-                    "}, 80);"; // <-- Se evalúa cada 80 milisegundos a máxima velocidad
+                    "}, 250);"; // cadencia más suave para no saturar el renderer
                 
                 java.util.List<WebElement> paneles = driver.findElements(By.cssSelector("mat-expansion-panel-header"));
                 
@@ -229,6 +234,15 @@ public class Scraper {
                             enlacesGuardados.addAll(enlacesExtraidosJS);
                             System.out.println("\n  -> En memoria: " + enlacesGuardados.size());
                         }
+
+                        // Colapsar el volumen ya procesado para liberar su DOM (memoria)
+                        // antes de abrir el siguiente; así solo hay uno expandido a la vez.
+                        try {
+                            js.executeScript("arguments[0].click();", panel);
+                            Thread.sleep(150);
+                        } catch (Exception e) {
+                            // Si el panel ya no es válido, continuar con el siguiente volumen.
+                        }
                     }
                 } else {
                     System.out.println("No se detectaron volúmenes agrupados. Extrayendo lista general con Turbo...");
@@ -238,20 +252,9 @@ public class Scraper {
                 }
                 
                 System.out.println("\n ¡Escaneo completo! Total de capítulos capturados en memoria: " + enlacesGuardados.size());
-                
+
                 // Creamos el HTML "limpio" y perfecto para que Jsoup no se confunda
-                StringBuilder domReconstruido = new StringBuilder();
-                domReconstruido.append("<!DOCTYPE html><html><head><title>SkyNovels Limpio</title></head><body>\n");
-                domReconstruido.append("<mat-expansion-panel>\n"); 
-                
-                for (String enlaceHtml : enlacesGuardados) {
-                    domReconstruido.append("<div class=\"skn-nvl-chp-element\">"); 
-                    domReconstruido.append(enlaceHtml);
-                    domReconstruido.append("</div>\n");
-                }
-                
-                domReconstruido.append("</mat-expansion-panel>\n</body></html>");
-                return domReconstruido.toString();
+                return reconstruirDomDesdeEnlaces(enlacesGuardados);
 
             } else {
                 // --- LÓGICA RÁPIDA PARA DEMÁS PÁGINAS (NOVA, TNL, BLOGGER) ---
@@ -275,8 +278,33 @@ public class Scraper {
 
         } catch (Exception e) {
             System.err.println("Advertencia obteniendo índice: " + e.getMessage());
-            return driver.getPageSource();
+            // Si es SkyNovels y ya capturamos enlaces, salvarlos en vez de petar con un navegador muerto.
+            if (esSkyNovels && !enlacesGuardados.isEmpty()) {
+                System.out.println("Salvando " + enlacesGuardados.size() + " capítulos capturados antes del fallo.");
+                return reconstruirDomDesdeEnlaces(enlacesGuardados);
+            }
+            // Último recurso: intentar el HTML, pero sin que un navegador muerto vuelva a petar.
+            try {
+                return driver.getPageSource();
+            } catch (Exception e2) {
+                System.err.println("No se pudo obtener el HTML tras el fallo: " + e2.getMessage());
+                return "<!DOCTYPE html><html><body></body></html>";
+            }
         }
+    }
+
+    /** Arma un HTML mínimo y bien formado a partir de los enlaces de capítulo capturados. */
+    private String reconstruirDomDesdeEnlaces(java.util.Collection<String> enlaces) {
+        StringBuilder dom = new StringBuilder();
+        dom.append("<!DOCTYPE html><html><head><title>SkyNovels Limpio</title></head><body>\n");
+        dom.append("<mat-expansion-panel>\n");
+        for (String enlaceHtml : enlaces) {
+            dom.append("<div class=\"skn-nvl-chp-element\">");
+            dom.append(enlaceHtml);
+            dom.append("</div>\n");
+        }
+        dom.append("</mat-expansion-panel>\n</body></html>");
+        return dom.toString();
     }
 
     public List<String> obtenerEnlacesCapitulosDesdeDom() {
