@@ -26,15 +26,19 @@ public class EpubService {
     private final ZipArchiveProcessor zipProcessor;
     private final InsertPageBookProcessor insertPageBookProcessor;
     private final JobService jobService;
+    /** Carpeta de salidas que no se entregan por /download (REEMPAQUETAR, INICIO_LIBRO). */
+    private final Path outputDir;
 
     public EpubService(StorageService storage, CalibreProcessor calibre, ZipArchiveProcessor zipProcessor,
-            SplitProcessor splitProcessor, InsertPageBookProcessor insertPageBookProcessor, JobService jobService) {
+            SplitProcessor splitProcessor, InsertPageBookProcessor insertPageBookProcessor, JobService jobService,
+            @org.springframework.beans.factory.annotation.Value("${app.storage.output-dir}") String outputDir) {
         this.storage = storage;
         this.calibre = calibre;
         this.zipProcessor = zipProcessor;
         this.splitProcessor = splitProcessor;
         this.insertPageBookProcessor = insertPageBookProcessor;
         this.jobService = jobService;
+        this.outputDir = Paths.get(outputDir);
     }
 
     /**
@@ -86,12 +90,11 @@ public class EpubService {
 
                         zipProcessor.descomprimirZip(input, carpetaFuente);
 
-                        String homeUsuario = System.getProperty("user.home");
-                        Path rutaDescargas = Paths.get(homeUsuario, "Downloads");
+                        java.nio.file.Files.createDirectories(outputDir);
 
                         String nombreBase = nombre.contains(".") ? nombre.substring(0, nombre.lastIndexOf('.'))
                                 : nombre;
-                        Path epubSalida = rutaDescargas.resolve(nombreBase + "_reempaquetado.epub");
+                        Path epubSalida = outputDir.resolve(nombreBase + "_reempaquetado.epub");
 
                         zipProcessor.reempaquetarComoEpub(id, carpetaFuente, epubSalida, puenteProgreso);
 
@@ -100,11 +103,8 @@ public class EpubService {
                         break;
 
                     case "INICIO_LIBRO":
-                        String homeUsuarioR = System.getProperty("user.home");
-                        Path rutaDescargasR = Paths.get(homeUsuarioR, "Downloads");
-
-                        Path nombreFinal = dir.resolve(nombre.replace(".epub", "_con_separadores.epub"));
-                        Path outputInicio = rutaDescargasR.resolve(nombreFinal);
+                        java.nio.file.Files.createDirectories(outputDir);
+                        Path outputInicio = outputDir.resolve(nombre.replace(".epub", "_con_separadores.epub"));
 
                         String sitv = (sitio != null) ? sitio : "";
                         String creadv = (creador != null) ? creador : "TecnoLector";
@@ -118,9 +118,12 @@ public class EpubService {
 
                     case "CONVERTIR_V3":
                         Path outputCalibre = dir.resolve(nombre.replace(".epub", "_v3.epub"));
-                        calibre.convertir(id, input, outputCalibre, puenteProgreso);
-                        jobService.setResultado(id, outputCalibre);
-                        jobService.actualizarMensaje(id, "LISTO");
+                        boolean convertido = calibre.convertir(id, input, outputCalibre, puenteProgreso);
+                        if (convertido) {
+                            jobService.setResultado(id, outputCalibre);
+                            jobService.actualizarMensaje(id, "LISTO");
+                        }
+                        // Si falló, convertir() ya dejó un mensaje "ERROR: ..." -> estado FALLIDO.
                         break;
 
                     default:

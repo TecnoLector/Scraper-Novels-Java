@@ -1,0 +1,14 @@
+# Lo que NO entra en el contexto de build (ni en la imagen).
+# Clave: 'drivers/' queda fuera -> dentro del contenedor no hay chromedriver,
+# así que Selenium Manager lo descarga y cachea solo.
+drivers/
+target/
+logs/
+.git
+.gitignore
+.mvn/
+mvnw
+mvnw.cmd
+Dockerfile
+docker-compose.yml
+*.md

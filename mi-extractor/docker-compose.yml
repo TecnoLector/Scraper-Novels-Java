@@ -1,0 +1,26 @@
+# Orquestacion local/VPS de mi-extractor. Para el dia del despliegue:
+#   docker compose up --build -d
+# No hace falta nada mas: Chrome va en la imagen y el driver se descarga solo (cacheado).
+services:
+  mi-extractor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mi-extractor:latest
+    container_name: mi-extractor
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+    # Chrome necesita /dev/shm amplio; si no, se cae en paginas pesadas.
+    shm_size: "1gb"
+    volumes:
+      # Salidas y temporales persistentes (coinciden con application-prod.properties).
+      - mi_data:/data
+      # Cache del chromedriver: se descarga UNA vez y sobrevive a reinicios.
+      - selenium_cache:/home/app/.cache/selenium
+    restart: unless-stopped
+
+volumes:
+  mi_data:
+  selenium_cache:
