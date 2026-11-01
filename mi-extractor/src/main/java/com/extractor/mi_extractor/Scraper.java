@@ -139,7 +139,8 @@ public class Scraper {
             return driver.getPageSource();
 
         } catch (Exception e) {
-            System.err.println("Error esperando/extrayendo HTML: " + e.getMessage());
+            // Mensaje conciso: el reintento del llamador decide si es un fallo real.
+            // (Antes se volcaba el stack completo de Selenium en cada intento -> ruido alarmante.)
             return null;
         }
     }

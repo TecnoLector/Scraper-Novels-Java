@@ -579,14 +579,18 @@ public class MenuExtractor {
                                     }
                                 }
                             } catch (Exception e) {
-                                System.err.println("X Error en Capitulo #" + numCap + " (intento " + intento + "): " + e.getMessage());
+                                // Excepción (navegador flojo/muerto): recrear antes de reintentar.
                                 scraperHilo.cerrar();
                                 scraperHilo = new Scraper();
+                            }
+                            if (!exito && intento < 3) {
+                                System.out.println("   > Cap #" + numCap + " no disponible, reintento " + (intento + 1) + "/3...");
                             }
                         }
 
                         // Si tras los reintentos no se logró, anotamos el error.
                         if (!exito) {
+                            System.err.println("X Cap #" + numCap + " no se pudo bajar tras 3 intentos (queda en faltantes).");
                             capitulosFallidos.add(numCap);
                         }
                         capitulosDescargadosPorEsteHilo++;
