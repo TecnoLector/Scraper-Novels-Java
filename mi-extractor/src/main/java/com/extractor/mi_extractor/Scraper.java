@@ -31,6 +31,7 @@ public class Scraper {
     private WebDriverWait wait;
     private JavascriptExecutor js;
     private SitioWebConfig configActual;
+    private boolean permisoAdquirido = false; // permiso del cupo global de navegadores
 
     private final String selectorContenidoCapitulo = "div.skn-chp-chapter-content";
 
@@ -102,7 +103,24 @@ public class Scraper {
         options.addArguments("--disable-dev-shm-usage");
         options.addArguments("--disable-extensions");
 
-        this.driver = new ChromeDriver(options);
+        // Tope GLOBAL: pedir un permiso antes de lanzar Chrome. Si ya hay el máximo de
+        // navegadores vivos, este hilo espera aquí hasta que se libere uno (protege la RAM).
+        try {
+            ConfigScraper.cupo().acquire();
+            this.permisoAdquirido = true;
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Interrumpido esperando un navegador disponible", ie);
+        }
+
+        try {
+            this.driver = new ChromeDriver(options);
+        } catch (RuntimeException e) {
+            // Chrome no arrancó: liberar el permiso para no bloquear a otros hilos.
+            ConfigScraper.cupo().release();
+            this.permisoAdquirido = false;
+            throw e;
+        }
         // Tope de carga de página: si una página no carga en 30 s, falla rápido en vez de
         // colgar el hilo hasta 5 min (pageLoad por defecto = 300 s).
         this.driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(30));
@@ -574,6 +592,11 @@ public class Scraper {
             } finally {
                 driver = null; // evita un segundo quit sobre un driver ya cerrado
             }
+        }
+        // Devolver el permiso al cupo global (una sola vez) para que otro hilo pueda abrir Chrome.
+        if (permisoAdquirido) {
+            ConfigScraper.cupo().release();
+            permisoAdquirido = false;
         }
     }
 }

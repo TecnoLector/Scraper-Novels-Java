@@ -519,7 +519,28 @@ public class MenuExtractor {
         }
 
         int totalCapitulos = capitulosParaDescargar.size();
-        int numeroHilos = 5;
+
+        // Tú eliges cuántos navegadores en paralelo; se recorta al tope global (RAM).
+        int maxNav = ConfigScraper.maxNavegadores();
+        int porDefecto = Math.min(5, maxNav);
+        System.out.print("¿Cuántos navegadores en paralelo? (1-" + maxNav + ", Enter = " + porDefecto + "): ");
+        int numeroHilos = porDefecto;
+        try {
+            String linea = scanner.nextLine().trim();
+            if (!linea.isEmpty()) {
+                int elegido = Integer.parseInt(linea);
+                if (elegido >= 1) {
+                    numeroHilos = Math.min(elegido, maxNav);
+                }
+            }
+        } catch (Exception e) {
+            // Entrada no numérica: se queda el valor por defecto.
+        }
+        if (numeroHilos < 1) {
+            numeroHilos = 1;
+        }
+        System.out.println("Usando " + numeroHilos + " navegadores (tope global: " + maxNav + ").");
+
         double constanteVelocidad = calcularConstanteRealista(numeroHilos);
         double tiempoTotalSegundos = (totalCapitulos * constanteVelocidad) / numeroHilos;
         long minutosEst = (long) (tiempoTotalSegundos / 60);
@@ -752,7 +773,11 @@ public class MenuExtractor {
             List<Double> keys = new ArrayList<>(filtrados.keySet());
             Collections.sort(keys);
             int aDescargar = keys.size();
-            int numHilosEfectivos = Math.min(hilos, aDescargar);
+            int maxNav = ConfigScraper.maxNavegadores();
+            if (hilos > maxNav) {
+                progresoWeb.accept("Aviso: pediste " + hilos + " navegadores; limitado al tope global de " + maxNav + ".");
+            }
+            int numHilosEfectivos = Math.min(Math.min(hilos, aDescargar), maxNav);
 
             String[] msgHilos = new String[numHilosEfectivos];
             int[] pctHilos = new int[numHilosEfectivos];
