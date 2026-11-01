@@ -101,6 +101,9 @@ public class Scraper {
         options.addArguments("--disable-extensions");
 
         this.driver = new ChromeDriver(options);
+        // Tope de carga de página: si una página no carga en 30 s, falla rápido en vez de
+        // colgar el hilo hasta 5 min (pageLoad por defecto = 300 s).
+        this.driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(30));
         this.wait = new WebDriverWait(driver, Duration.ofSeconds(10));
         this.js = (JavascriptExecutor) driver;
 

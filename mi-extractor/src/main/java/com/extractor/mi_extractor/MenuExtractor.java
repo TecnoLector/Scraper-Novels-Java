@@ -561,27 +561,31 @@ public class MenuExtractor {
                         String urlCap = entrada.getValue();
                         
                         boolean exito = false; // Bandera para saber si se logró guardar
-                        
-                        try {
-                            System.out.println("[Hilo " + Thread.currentThread().getId() + "] Bajando Capitulo #" + numCap);
+                        System.out.println("[Hilo " + Thread.currentThread().getId() + "] Bajando Capitulo #" + numCap);
 
-                            scraperHilo.navegarA(urlCap);
-                            String html = scraperHilo.obtenerHtmlDePagina();
-                            SitioWebConfig configDetectada = scraperHilo.getConfig();
-                            ExtractorContenido extractor = new ExtractorContenido();
-                            Capitulo capitulo = extractor.extraer(html, configDetectada);
-
-                            if (capitulo != null) {
-                                EscritorArchivo escritor = new EscritorArchivo();
-                                escritor.guardarCapitulo(capitulo, rutaDeGuardado, numCap);
-                                contadorExitos.incrementAndGet();
-                                exito = true; // Todo salió perfecto
+                        // Reintentos: los fallos suelen ser transitorios (página lenta). Guard del
+                        // null evita el NPE de Jsoup.parse(null); se recrea el navegador solo si hubo
+                        // excepción (pudo quedar flojo/muerto).
+                        for (int intento = 1; intento <= 3 && !exito; intento++) {
+                            try {
+                                scraperHilo.navegarA(urlCap);
+                                String html = scraperHilo.obtenerHtmlDePagina();
+                                if (html != null) {
+                                    Capitulo capitulo = new ExtractorContenido().extraer(html, scraperHilo.getConfig());
+                                    if (capitulo != null) {
+                                        new EscritorArchivo().guardarCapitulo(capitulo, rutaDeGuardado, numCap);
+                                        contadorExitos.incrementAndGet();
+                                        exito = true;
+                                    }
+                                }
+                            } catch (Exception e) {
+                                System.err.println("X Error en Capitulo #" + numCap + " (intento " + intento + "): " + e.getMessage());
+                                scraperHilo.cerrar();
+                                scraperHilo = new Scraper();
                             }
-                        } catch (Exception e) {
-                            System.err.println("X Error en Capitulo #" + numCap + ": " + e.getMessage());
                         }
-                        
-                        // Si hubo excepción o si el capítulo fue NULL, anotamos el error
+
+                        // Si tras los reintentos no se logró, anotamos el error.
                         if (!exito) {
                             capitulosFallidos.add(numCap);
                         }
@@ -788,20 +792,28 @@ public class MenuExtractor {
                             pctHilos[idH] = (int) (((double) count / miLote.size()) * 100);
                             updateUI.run();
 
-                            // Resiliencia por capítulo: un fallo NO debe abandonar el resto del lote.
-                            try {
-                                sH.navegarA(filtrados.get(nCap));
-                                Capitulo c = eH.extraer(sH.obtenerHtmlDePagina(), sH.getConfig());
-                                if (c != null) {
-                                    wH.guardarCapitulo(c, rutaBaseStr, nCap);
-                                } else {
-                                    faltantes.add(nCap); // sin contenido
+                            // Descarga con reintentos: los fallos suelen ser transitorios (página
+                            // lenta). El guard del null evita el NPE de Jsoup.parse(null); solo se
+                            // recrea el navegador si hubo excepción (pudo quedar flojo/muerto).
+                            boolean ok = false;
+                            for (int intento = 1; intento <= 3 && !ok; intento++) {
+                                try {
+                                    sH.navegarA(filtrados.get(nCap));
+                                    String html = sH.obtenerHtmlDePagina();
+                                    if (html != null) {
+                                        Capitulo c = eH.extraer(html, sH.getConfig());
+                                        if (c != null) {
+                                            wH.guardarCapitulo(c, rutaBaseStr, nCap);
+                                            ok = true;
+                                        }
+                                    }
+                                } catch (Exception capEx) {
+                                    sH.cerrar();
+                                    sH = new Scraper();
                                 }
-                            } catch (Exception capEx) {
+                            }
+                            if (!ok) {
                                 faltantes.add(nCap);
-                                // El navegador pudo morir: recrearlo para seguir con el resto del lote.
-                                sH.cerrar();
-                                sH = new Scraper();
                             }
 
                             count++;
