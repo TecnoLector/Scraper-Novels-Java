@@ -1,15 +1,11 @@
 package com.extractor.mi_extractor;
 
 import java.util.function.Consumer;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
@@ -563,110 +559,45 @@ public class MenuExtractor {
             return;
         }
         
-        ExecutorService executor = Executors.newFixedThreadPool(numeroHilos);
-        AtomicInteger contadorExitos = new AtomicInteger(0);
-        
-        // --- NUEVO: LISTA SEGURA PARA RECOLECTAR ERRORES ORDENADOS ---
-        java.util.Set<Double> capitulosFallidos = new java.util.concurrent.ConcurrentSkipListSet<>();
-        // Capítulos VIP (bloqueados): no son errores, requieren desbloqueo en tu cuenta.
-        java.util.Set<Double> capitulosVip = new java.util.concurrent.ConcurrentSkipListSet<>();
-
         System.out.println("\n>>> INICIANDO DESCARGA CON " + numeroHilos + " NAVEGADORES...");
 
-        List<Map.Entry<Double, String>> listaTotal = new ArrayList<>(capitulosParaDescargar.entrySet());
-        int tamanoLote = (int) Math.ceil((double) totalCapitulos / numeroHilos);
-
-        for (int i = 0; i < numeroHilos; i++) {
-            final int inicio = i * tamanoLote;
-            if (inicio >= totalCapitulos)
-                break;
-
-            final int fin = Math.min(inicio + tamanoLote, totalCapitulos);
-            List<Map.Entry<Double, String>> subLista = listaTotal.subList(inicio, fin);
-            
-            executor.submit(() -> {
-                Scraper scraperHilo = new Scraper();
-                int capitulosDescargadosPorEsteHilo = 0;
-
-                try {
-                    for (Map.Entry<Double, String> entrada : subLista) {
-                        double numCap = entrada.getKey();
-                        String urlCap = entrada.getValue();
-                        
-                        boolean exito = false; // Bandera para saber si se logró guardar
-                        boolean esVip = false; // Capítulo VIP/bloqueado: se salta al instante
-                        System.out.println("[Hilo " + Thread.currentThread().getId() + "] Bajando Capitulo #" + numCap);
-
-                        // Reintentos solo para fallos transitorios. Un VIP se detecta al instante y
-                        // corta el bucle (no gasta reintentos). Se recrea el navegador si hubo excepción.
-                        for (int intento = 1; intento <= 3 && !exito && !esVip; intento++) {
-                            try {
-                                scraperHilo.navegarA(urlCap);
-                                Scraper.ResultadoCapitulo r = scraperHilo.obtenerContenidoOVip();
-                                if (r.vip) {
-                                    esVip = true;
-                                } else if (r.html != null) {
-                                    Capitulo capitulo = new ExtractorContenido().extraer(r.html, scraperHilo.getConfig());
-                                    if (capitulo != null) {
-                                        new EscritorArchivo().guardarCapitulo(capitulo, rutaDeGuardado, numCap);
-                                        contadorExitos.incrementAndGet();
-                                        exito = true;
-                                    }
-                                }
-                            } catch (Exception e) {
-                                // Excepción (navegador flojo/muerto): recrear antes de reintentar.
-                                scraperHilo.cerrar();
-                                scraperHilo = new Scraper();
-                            }
-                            if (!exito && !esVip && intento < 3) {
-                                System.out.println("   > Cap #" + numCap + " no disponible, reintento " + (intento + 1) + "/3...");
-                            }
-                        }
-
-                        if (esVip) {
-                            System.out.println("VIP Cap #" + numCap + " es VIP (bloqueado), se omite.");
-                            capitulosVip.add(numCap);
-                        } else if (!exito) {
-                            System.err.println("X Cap #" + numCap + " no se pudo bajar tras 3 intentos: " + urlCap);
-                            capitulosFallidos.add(numCap);
-                        }
-                        capitulosDescargadosPorEsteHilo++;
-                        
-                        if (capitulosDescargadosPorEsteHilo % 100 == 0) {
-                            System.out.println("[Hilo " + Thread.currentThread().getId() + "] Refrescando navegador para liberar RAM...");
-                            scraperHilo.cerrar();
-                            scraperHilo = new Scraper();
-                        }
-                        // ----------------------------------------------------
+        // ADR-001: el bucle de descarga vive en MotorDescargaParalela (una sola copia,
+        // compartida con la web). Aquí la CLI solo imprime el progreso a consola.
+        MotorDescargaParalela motor = new MotorDescargaParalela();
+        MotorDescargaParalela.ResultadoLote resultado = motor.ejecutar(
+                capitulosParaDescargar, rutaDeGuardado, numeroHilos,
+                new MotorDescargaParalela.ProgresoDescarga() {
+                    @Override
+                    public void capituloIniciado(int hiloIdx, double numCap, int hechosEnHilo,
+                            int totalEnHilo, int hechosGlobal, int totalGlobal) {
+                        System.out.println("[Hilo " + hiloIdx + "] Bajando Capitulo #"
+                                + formatearNumeroCap(numCap));
                     }
-                } finally {
-                    scraperHilo.cerrar();
-                }
-            });
-        }
 
-        executor.shutdown();
-        try {
-            if (!executor.awaitTermination(4, TimeUnit.HOURS)) {
-                executor.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            executor.shutdownNow();
-            Thread.currentThread().interrupt();
-        }
+                    @Override
+                    public void capituloTerminado(int hiloIdx, double numCap, int hechosEnHilo,
+                            int totalEnHilo, int hechosGlobal, int totalGlobal) {
+                        // En consola no hace falta refrescar nada al terminar cada capítulo.
+                    }
+
+                    @Override
+                    public void hiloTerminado(int hiloIdx) {
+                        // La CLI no pinta una barra por hilo.
+                    }
+                });
 
         System.out.println("\n--- Proceso finalizado ---");
-        System.out.println("Descargados correctamente: " + contadorExitos.get() + "/" + totalCapitulos);
+        System.out.println("Descargados correctamente: " + resultado.exitos + "/" + resultado.total);
         System.out.println("Cantidad de hilos: " + numeroHilos);
-        
+
         // --- REPORTE: VIP (bloqueados) vs fallos reales ---
-        if (!capitulosVip.isEmpty()) {
-            System.out.println("\n VIP (bloqueados, requieren desbloqueo en tu cuenta): " + capitulosVip.size());
-            System.out.println(formatearListaCaps(capitulosVip));
+        if (!resultado.vip.isEmpty()) {
+            System.out.println("\n VIP (bloqueados, requieren desbloqueo en tu cuenta): " + resultado.vip.size());
+            System.out.println(formatearListaCaps(resultado.vip));
         }
-        if (!capitulosFallidos.isEmpty()) {
-            System.out.println("\n ATENCIÓN: fallaron " + capitulosFallidos.size() + " capítulos (error, NO VIP):");
-            System.out.println(formatearListaCaps(capitulosFallidos));
+        if (!resultado.faltantes.isEmpty()) {
+            System.out.println("\n ATENCIÓN: fallaron " + resultado.faltantes.size() + " capítulos (error, NO VIP):");
+            System.out.println(formatearListaCaps(resultado.faltantes));
             System.out.println();
         }
 
@@ -747,7 +678,6 @@ public class MenuExtractor {
     // ==============================================================
     public Path descargarWebMultiHilo(int opcion, String url, int hilos, int limite, int inicio, int fin,
             String listaStr, String rutaBaseStr, Consumer<String> progresoWeb) {
-        ExecutorService executor = null; // Definido fuera para el cierre de emergencia
         try {
             Path pathBase = Paths.get(rutaBaseStr);
             Files.createDirectories(pathBase);
@@ -770,30 +700,26 @@ public class MenuExtractor {
             }
 
             // --- PREPARACIÓN DEL MOTOR ---
-            List<Double> keys = new ArrayList<>(filtrados.keySet());
-            Collections.sort(keys);
-            int aDescargar = keys.size();
+            // Orden ascendente estable para que el troceo por hilos sea determinista.
+            java.util.TreeMap<Double, String> ordenados = new java.util.TreeMap<>(filtrados);
+            final int aDescargar = ordenados.size();
             int maxNav = ConfigScraper.maxNavegadores();
             if (hilos > maxNav) {
                 progresoWeb.accept("Aviso: pediste " + hilos + " navegadores; limitado al tope global de " + maxNav + ".");
             }
-            int numHilosEfectivos = Math.min(Math.min(hilos, aDescargar), maxNav);
+            final int numHilosEfectivos = Math.min(Math.min(hilos, aDescargar), maxNav);
 
+            // Estado por hilo para la UI (el JSON de progreso sale idéntico al de antes).
             String[] msgHilos = new String[numHilosEfectivos];
             int[] pctHilos = new int[numHilosEfectivos];
-            AtomicInteger globales = new AtomicInteger(0);
-            // Capítulos planificados que NO se llegaron a guardar (números exactos, decimales incluidos).
-            java.util.Set<Double> faltantes = new java.util.concurrent.ConcurrentSkipListSet<>();
-            // Capítulos VIP (bloqueados): no son errores, requieren desbloqueo en tu cuenta.
-            java.util.Set<Double> vip = new java.util.concurrent.ConcurrentSkipListSet<>();
             for (int i = 0; i < numHilosEfectivos; i++) {
                 msgHilos[i] = "Iniciando...";
                 pctHilos[i] = 0;
             }
 
-            // Función de reporte JSON para la web
-            Runnable updateUI = () -> {
-                int gPct = 30 + (int) (((double) globales.get() / aDescargar) * 60);
+            // Arma y emite el JSON multihilo que ya consume el front (mismo formato).
+            java.util.function.BiConsumer<Integer, Integer> emitirJson = (hechoGlobal, totalGlobal) -> {
+                int gPct = 30 + (int) (((double) hechoGlobal / totalGlobal) * 60);
                 StringBuilder sb = new StringBuilder("{ \"tipo\": \"MULTIHILO\", \"globalPct\": ").append(gPct)
                         .append(", \"hilos\": [");
                 for (int i = 0; i < numHilosEfectivos; i++) {
@@ -806,85 +732,45 @@ public class MenuExtractor {
                 progresoWeb.accept(sb.toString());
             };
 
-            // INICIO DEL EXECUTOR
-            executor = Executors.newFixedThreadPool(numHilosEfectivos);
-            int chunkSize = (int) Math.ceil((double) aDescargar / numHilosEfectivos);
-
-            for (int i = 0; i < numHilosEfectivos; i++) {
-                final int idH = i;
-                int start = i * chunkSize;
-                int end = Math.min(start + chunkSize, aDescargar);
-                if (start >= aDescargar)
-                    break;
-                List<Double> miLote = keys.subList(start, end);
-
-                executor.submit(() -> {
-                    Scraper sH = new Scraper();
-                    ExtractorContenido eH = new ExtractorContenido();
-                    EscritorArchivo wH = new EscritorArchivo();
-                    int count = 0;
-                    try {
-                        for (Double nCap : miLote) {
-                            msgHilos[idH] = "Cap #" + nCap;
-                            pctHilos[idH] = (int) (((double) count / miLote.size()) * 100);
-                            updateUI.run();
-
-                            // Descarga con reintentos: los fallos suelen ser transitorios (página
-                            // lenta). El guard del null evita el NPE de Jsoup.parse(null); solo se
-                            // recrea el navegador si hubo excepción (pudo quedar flojo/muerto).
-                            boolean ok = false;
-                            boolean esVip = false;
-                            for (int intento = 1; intento <= 3 && !ok && !esVip; intento++) {
-                                try {
-                                    sH.navegarA(filtrados.get(nCap));
-                                    Scraper.ResultadoCapitulo r = sH.obtenerContenidoOVip();
-                                    if (r.vip) {
-                                        esVip = true;
-                                    } else if (r.html != null) {
-                                        Capitulo c = eH.extraer(r.html, sH.getConfig());
-                                        if (c != null) {
-                                            wH.guardarCapitulo(c, rutaBaseStr, nCap);
-                                            ok = true;
-                                        }
-                                    }
-                                } catch (Exception capEx) {
-                                    sH.cerrar();
-                                    sH = new Scraper();
-                                }
-                            }
-                            if (esVip) {
-                                vip.add(nCap);
-                            } else if (!ok) {
-                                faltantes.add(nCap);
-                            }
-
-                            count++;
-                            globales.incrementAndGet();
-                            updateUI.run();
+            // ADR-001: el bucle de descarga vive en MotorDescargaParalela (compartido con la CLI).
+            MotorDescargaParalela motor = new MotorDescargaParalela();
+            MotorDescargaParalela.ResultadoLote res = motor.ejecutar(
+                    ordenados, rutaBaseStr, numHilosEfectivos,
+                    new MotorDescargaParalela.ProgresoDescarga() {
+                        @Override
+                        public void capituloIniciado(int hiloIdx, double numCap, int hechosEnHilo,
+                                int totalEnHilo, int hechosGlobal, int totalGlobal) {
+                            msgHilos[hiloIdx] = "Cap #" + formatearNumeroCap(numCap);
+                            pctHilos[hiloIdx] = (totalEnHilo == 0) ? 0
+                                    : (int) (((double) hechosEnHilo / totalEnHilo) * 100);
+                            emitirJson.accept(hechosGlobal, totalGlobal);
                         }
-                        msgHilos[idH] = "LISTO ✅";
-                        pctHilos[idH] = 100;
-                        updateUI.run();
-                    } catch (Exception ex) {
-                        msgHilos[idH] = "ERROR ❌";
-                    } finally {
-                        sH.cerrar();
-                    }
-                });
-            }
 
-            executor.shutdown();
-            executor.awaitTermination(5, TimeUnit.HOURS);
+                        @Override
+                        public void capituloTerminado(int hiloIdx, double numCap, int hechosEnHilo,
+                                int totalEnHilo, int hechosGlobal, int totalGlobal) {
+                            pctHilos[hiloIdx] = (totalEnHilo == 0) ? 0
+                                    : (int) (((double) hechosEnHilo / totalEnHilo) * 100);
+                            emitirJson.accept(hechosGlobal, totalGlobal);
+                        }
+
+                        @Override
+                        public void hiloTerminado(int hiloIdx) {
+                            msgHilos[hiloIdx] = "LISTO ✅";
+                            pctHilos[hiloIdx] = 100;
+                            emitirJson.accept(aDescargar, aDescargar);
+                        }
+                    });
 
             // Reporte: VIP (bloqueados) y fallos reales, con números exactos.
-            if (!faltantes.isEmpty() || !vip.isEmpty()) {
-                escribirReporteFaltantes(pathBase, faltantes, vip);
+            if (!res.faltantes.isEmpty() || !res.vip.isEmpty()) {
+                escribirReporteFaltantes(pathBase, res.faltantes, res.vip);
                 StringBuilder resumen = new StringBuilder("95% - Completado.");
-                if (!vip.isEmpty()) {
-                    resumen.append(" VIP (bloqueados): ").append(vip.size()).append('.');
+                if (!res.vip.isEmpty()) {
+                    resumen.append(" VIP (bloqueados): ").append(res.vip.size()).append('.');
                 }
-                if (!faltantes.isEmpty()) {
-                    resumen.append(" Sin bajar: ").append(formatearListaCaps(faltantes)).append('.');
+                if (!res.faltantes.isEmpty()) {
+                    resumen.append(" Sin bajar: ").append(formatearListaCaps(res.faltantes)).append('.');
                 }
                 resumen.append(" Ver FALTANTES.txt.");
                 progresoWeb.accept(resumen.toString());
@@ -894,11 +780,6 @@ public class MenuExtractor {
         } catch (Exception e) {
             progresoWeb.accept("ERROR: " + e.getMessage());
             return null;
-        } finally {
-            // CIERRE DE EMERGENCIA: Si el executor quedó vivo por un error, lo matamos aquí
-            if (executor != null && !executor.isShutdown()) {
-                executor.shutdownNow();
-            }
         }
     }
 
