@@ -6,7 +6,6 @@ import java.util.concurrent.TimeUnit;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.TreeMap;
@@ -559,10 +558,11 @@ public class MenuExtractor {
             return;
         }
         
-        System.out.println("\n>>> INICIANDO DESCARGA CON " + numeroHilos + " NAVEGADORES...");
+        System.out.println("\n>>> Descargando " + totalCapitulos + " capítulos con " + numeroHilos + " navegadores...\n");
 
         // ADR-001: el bucle de descarga vive en MotorDescargaParalela (una sola copia,
-        // compartida con la web). Aquí la CLI solo imprime el progreso a consola.
+        // compartida con la web). Aquí la CLI solo pinta una barra de progreso en vivo.
+        final Object lockBarra = new Object();
         MotorDescargaParalela motor = new MotorDescargaParalela();
         MotorDescargaParalela.ResultadoLote resultado = motor.ejecutar(
                 capitulosParaDescargar, rutaDeGuardado, numeroHilos,
@@ -570,38 +570,85 @@ public class MenuExtractor {
                     @Override
                     public void capituloIniciado(int hiloIdx, double numCap, int hechosEnHilo,
                             int totalEnHilo, int hechosGlobal, int totalGlobal) {
-                        System.out.println("[Hilo " + hiloIdx + "] Bajando Capitulo #"
-                                + formatearNumeroCap(numCap));
+                        // La barra se repinta al COMPLETAR cada capítulo (capituloTerminado).
                     }
 
                     @Override
                     public void capituloTerminado(int hiloIdx, double numCap, int hechosEnHilo,
                             int totalEnHilo, int hechosGlobal, int totalGlobal) {
-                        // En consola no hace falta refrescar nada al terminar cada capítulo.
+                        synchronized (lockBarra) {
+                            imprimirBarraProgreso(hechosGlobal, totalGlobal);
+                        }
                     }
 
                     @Override
                     public void hiloTerminado(int hiloIdx) {
-                        // La CLI no pinta una barra por hilo.
+                        // nada: el resumen final se imprime al terminar todo el lote.
                     }
                 });
+        System.out.println(); // cerrar la línea de la barra (venía con \r, sin salto)
 
-        System.out.println("\n--- Proceso finalizado ---");
-        System.out.println("Descargados correctamente: " + resultado.exitos + "/" + resultado.total);
-        System.out.println("Cantidad de hilos: " + numeroHilos);
-
-        // --- REPORTE: VIP (bloqueados) vs fallos reales ---
-        if (!resultado.vip.isEmpty()) {
-            System.out.println("\n VIP (bloqueados, requieren desbloqueo en tu cuenta): " + resultado.vip.size());
-            System.out.println(formatearListaCaps(resultado.vip));
-        }
-        if (!resultado.faltantes.isEmpty()) {
-            System.out.println("\n ATENCIÓN: fallaron " + resultado.faltantes.size() + " capítulos (error, NO VIP):");
-            System.out.println(formatearListaCaps(resultado.faltantes));
-            System.out.println();
+        // Deja constancia en disco de VIP y fallidos (junto a los capítulos, en la carpeta de la novela).
+        boolean hayPendientes = !resultado.vip.isEmpty() || !resultado.faltantes.isEmpty();
+        if (hayPendientes) {
+            escribirReporteFaltantes(Paths.get(rutaDeGuardado), resultado.faltantes, resultado.vip);
         }
 
-        System.out.println("--- Fin del Módulo Extractor ---");
+        imprimirResumenDescarga(resultado, numeroHilos);
+
+        if (hayPendientes) {
+            System.out.println("   Detalle en: " + Paths.get(rutaDeGuardado, "FALTANTES.txt").toAbsolutePath());
+            System.out.println("   (y la URL de cada fallo en logs/mi-extractor.log)");
+        }
+    }
+
+    /**
+     * Barra de progreso ASCII en una sola línea. Se reescribe sobre sí misma con '\r' (sin salto),
+     * así que avanza en el mismo renglón. ASCII puro para que se vea bien en cualquier terminal.
+     */
+    private static void imprimirBarraProgreso(int hechos, int total) {
+        final int ancho = 30;
+        double ratio = (total <= 0) ? 1.0 : (double) hechos / total;
+        if (ratio > 1.0) {
+            ratio = 1.0;
+        }
+        int lleno = (int) Math.round(ratio * ancho);
+        StringBuilder b = new StringBuilder();
+        b.append("\r  Descargando  [");
+        for (int i = 0; i < ancho; i++) {
+            if (i < lleno - 1) {
+                b.append('=');
+            } else if (i == lleno - 1) {
+                b.append('>');
+            } else {
+                b.append(' ');
+            }
+        }
+        b.append("] ").append(String.format("%3d%%", (int) Math.round(ratio * 100)))
+                .append("   ").append(hechos).append('/').append(total).append("   ");
+        System.out.print(b);
+        System.out.flush();
+    }
+
+    /** Resumen final de la descarga en una caja ASCII limpia. */
+    private static void imprimirResumenDescarga(MotorDescargaParalela.ResultadoLote r, int numeroHilos) {
+        System.out.println();
+        System.out.println("  ------------------------------------------------");
+        System.out.println("   Descarga finalizada");
+        System.out.println("  ------------------------------------------------");
+        System.out.println("   Guardados   : " + r.exitos + " / " + r.total);
+        System.out.println("   VIP         : " + r.vip.size());
+        System.out.println("   Fallidos    : " + r.faltantes.size());
+        System.out.println("   Navegadores : " + numeroHilos);
+        System.out.println("  ------------------------------------------------");
+        if (!r.vip.isEmpty()) {
+            System.out.println("   VIP (bloqueados, requieren desbloqueo en tu cuenta):");
+            System.out.println("   " + formatearListaCaps(r.vip));
+        }
+        if (!r.faltantes.isEmpty()) {
+            System.out.println("   Fallidos (error, NO VIP):");
+            System.out.println("   " + formatearListaCaps(r.faltantes));
+        }
     }
 
     private static double calcularConstanteRealista(int hilos) {

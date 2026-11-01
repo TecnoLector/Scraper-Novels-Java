@@ -1,12 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   Configuración de logging para mi-extractor (la usan tanto la app web Spring Boot
-  como el CLI). Consola en UTF-8 (arregla acentos/emojis ilegibles) + archivo con
-  rotación diaria. Para ver logs DEBUG, cambia el nivel del logger com.extractor a DEBUG.
+  como el CLI).
+
+  Estrategia:
+  - CONSOLA: solo INFO+ (barra de progreso y mensajes limpios; sin ruido por-capítulo).
+  - ARCHIVO (logs/mi-extractor.log): DEBUG de nuestro propio código, para diagnóstico
+    (p. ej. la URL exacta de un capítulo que falló). Rota a diario, 7 días.
+  Ambos en UTF-8. Para ver TODO el detalle en consola, baja el ThresholdFilter de CONSOLE a DEBUG.
 -->
 <configuration>
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <!-- La consola se queda en INFO: el detalle por-capítulo (DEBUG) no la ensucia. -->
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>INFO</level>
+        </filter>
         <encoder>
             <charset>UTF-8</charset>
             <pattern>%d{HH:mm:ss.SSS} %-5level [%thread] %logger{28} - %msg%n</pattern>
@@ -29,7 +38,14 @@
     <logger name="org.openqa.selenium" level="WARN"/>
     <logger name="org.apache.http" level="WARN"/>
 
-    <logger name="com.extractor.mi_extractor" level="INFO"/>
+    <!--
+      Nuestro código en DEBUG, pero solo el ARCHIVO lo recibe entero: la CONSOLA lo filtra
+      a INFO. additivity=false evita duplicar en los appenders del root.
+    -->
+    <logger name="com.extractor.mi_extractor" level="DEBUG" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </logger>
 
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>

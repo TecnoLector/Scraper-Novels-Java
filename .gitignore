@@ -1,0 +1,2 @@
+# Logs generados en tiempo de ejecución (logback). Se crean según el CWD.
+logs/

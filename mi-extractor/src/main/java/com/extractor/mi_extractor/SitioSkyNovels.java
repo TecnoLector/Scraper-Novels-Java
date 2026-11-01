@@ -74,7 +74,7 @@ public class SitioSkyNovels extends SitioWebConfig {
         try {
             prepararIndice(driver, js, wait);
 
-            log.info("Modo SkyNovels: Extracción asíncrona iniciada...");
+            log.debug("Modo SkyNovels: Extracción asíncrona iniciada...");
 
             // IMPORTANTE: Le damos permiso a Selenium de esperar la respuesta asíncrona
             driver.manage().timeouts().scriptTimeout(Duration.ofSeconds(60));
@@ -115,7 +115,7 @@ public class SitioSkyNovels extends SitioWebConfig {
             List<WebElement> paneles = driver.findElements(By.cssSelector("mat-expansion-panel-header"));
 
             if (!paneles.isEmpty()) {
-                log.info("\n Se detectaron {} volúmenes. Analizando a velocidad extrema...", paneles.size());
+                log.debug("Se detectaron {} volúmenes. Analizando a velocidad extrema...", paneles.size());
                 for (int i = 0; i < paneles.size(); i++) {
                     paneles = driver.findElements(By.cssSelector("mat-expansion-panel-header"));
                     if (i >= paneles.size()) break;
@@ -130,7 +130,7 @@ public class SitioSkyNovels extends SitioWebConfig {
                         Thread.sleep(600); // Dar 0.6s para que Angular abra el panel
                     }
 
-                    log.info(" -> Ecaneando Volumen {}...", (i + 1));
+                    log.debug(" -> Escaneando Volumen {}...", (i + 1));
 
                     // Aquí llamamos al Turbo Script y Java espera pacientemente (en milisegundos)
                     @SuppressWarnings("unchecked")
@@ -138,7 +138,7 @@ public class SitioSkyNovels extends SitioWebConfig {
 
                     if (enlacesExtraidosJS != null) {
                         enlacesGuardados.addAll(enlacesExtraidosJS);
-                        log.info("\n  -> En memoria: {}", enlacesGuardados.size());
+                        log.debug("  -> En memoria: {}", enlacesGuardados.size());
                     }
 
                     // Colapsar el volumen ya procesado para liberar su DOM (memoria)
@@ -151,13 +151,13 @@ public class SitioSkyNovels extends SitioWebConfig {
                     }
                 }
             } else {
-                log.info("No se detectaron volúmenes agrupados. Extrayendo lista general con Turbo...");
+                log.debug("No se detectaron volúmenes agrupados. Extrayendo lista general con Turbo...");
                 @SuppressWarnings("unchecked")
                 List<String> enlacesExtraidosJS = (List<String>) js.executeAsyncScript(jsTurbo);
                 if (enlacesExtraidosJS != null) enlacesGuardados.addAll(enlacesExtraidosJS);
             }
 
-            log.info("\n ¡Escaneo completo! Total de capítulos capturados en memoria: {}", enlacesGuardados.size());
+            log.debug("¡Escaneo completo! Total de capítulos capturados en memoria: {}", enlacesGuardados.size());
 
             // Creamos el HTML "limpio" y perfecto para que Jsoup no se confunda
             return reconstruirDomDesdeEnlaces(enlacesGuardados);

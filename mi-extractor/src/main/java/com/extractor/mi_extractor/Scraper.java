@@ -70,12 +70,12 @@ public class Scraper {
         if (driverLocal != null) {
             // Ya hay un driver local: usarlo tal cual, sin descargar nada.
             System.setProperty("webdriver.chrome.driver", driverLocal);
-            log.info("Usando chromedriver local: " + driverLocal);
+            log.debug("Usando chromedriver local: " + driverLocal);
         } else {
             // No hay driver local: que Selenium Manager lo descargue UNA vez y lo cachee
             // (~/.cache/selenium) para reutilizarlo en los siguientes arranques.
             System.clearProperty("webdriver.chrome.driver");
-            log.info("No se encontró chromedriver local; Selenium Manager lo descargará una vez y lo reutilizará.");
+            log.debug("No se encontró chromedriver local; Selenium Manager lo descargará una vez y lo reutilizará.");
         }
         ChromeOptions options = new ChromeOptions();
 
@@ -124,7 +124,7 @@ public class Scraper {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             if (this.driver != null) {
                 try {
-                    log.info("Limpiando procesos huérfanos de Chromee...");
+                    log.debug("Limpiando procesos huérfanos de Chrome...");
                     this.driver.quit();
                 } catch (Exception e) {
                     // Ignorar errores durante el apagado de emergencia
@@ -330,7 +330,7 @@ public class Scraper {
 
     public void cerrar() {
         if (driver != null) {
-            log.info("Cerrando el navegador.");
+            log.debug("Cerrando el navegador.");
             try {
                 driver.quit();
             } catch (Exception e) {

@@ -125,7 +125,7 @@ public class IndiceExtractor {
             }
         }
 
-        log.info("Se procesaron {} enlaces a capítulos con éxito.", mapaCapitulos.size());
+        log.debug("Se procesaron {} enlaces a capítulos con éxito.", mapaCapitulos.size());
         return mapaCapitulos;
     }
 

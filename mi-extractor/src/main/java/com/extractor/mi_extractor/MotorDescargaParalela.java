@@ -181,10 +181,12 @@ public class MotorDescargaParalela {
                 }
 
                 if (esVip) {
-                    log.info("Cap #{} es VIP (bloqueado), se omite.", numCap);
+                    log.debug("Cap #{} es VIP (bloqueado), se omite.", numCap);
                     vip.add(numCap);
                 } else if (!exito) {
-                    log.warn("Cap #{} no se pudo bajar tras {} intentos: {}", numCap, MAX_INTENTOS, urlCap);
+                    // A DEBUG (archivo) para no romper la barra de progreso de la CLI; el resumen
+                    // final y FALTANTES.txt enumeran los fallidos, y el .log guarda la URL.
+                    log.debug("Cap #{} no se pudo bajar tras {} intentos: {}", numCap, MAX_INTENTOS, urlCap);
                     faltantes.add(numCap);
                 }
 
@@ -193,7 +195,7 @@ public class MotorDescargaParalela {
                 cb.capituloTerminado(idH, numCap, hechosEnHilo, totalEnHilo, globales.get(), total);
 
                 if (hechosEnHilo % REFRESCO_CADA == 0) {
-                    log.info("[Hilo {}] Refrescando navegador para liberar RAM...", idH);
+                    log.debug("[Hilo {}] Refrescando navegador para liberar RAM...", idH);
                     scraper.cerrar();
                     scraper = fabricaScraper.get();
                 }

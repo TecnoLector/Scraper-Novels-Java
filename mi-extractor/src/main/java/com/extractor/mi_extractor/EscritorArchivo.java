@@ -35,7 +35,7 @@ public class EscritorArchivo {
         // Usamos la plantilla XHTML correcta (EPUB 2)
         String plantillaXHTML = construirPlantillaXHTML(titulo, contenidoHtml);
         Files.writeString(rutaCompleta, plantillaXHTML);
-        log.info("Guardado: {}", rutaCompleta);
+        log.debug("Guardado: {}", rutaCompleta);
     }
 
     // --- PLANTILLA XHTML PARA EPUB 3 (HTML5) ---

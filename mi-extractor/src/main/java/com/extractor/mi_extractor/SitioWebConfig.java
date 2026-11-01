@@ -39,14 +39,14 @@ public abstract class SitioWebConfig {
             WebDriverWait waitBreve = new WebDriverWait(driver, Duration.ofSeconds(3));
             WebElement pestana = waitBreve.until(ExpectedConditions.elementToBeClickable(By.xpath(xPathContenido)));
             if (pestana != null) {
-                log.info("Pestaña 'Contenido' detectada. Haciendo clic...");
+                log.debug("Pestaña 'Contenido' detectada. Haciendo clic...");
                 js.executeScript("arguments[0].click();", pestana);
                 Thread.sleep(2000);
             }
         } catch (Exception e) {
-            log.info("Nota: No se necesitó cambiar de pestaña o ya estaba activa.");
+            log.debug("Nota: No se necesitó cambiar de pestaña o ya estaba activa.");
         }
-        log.info("Esperando estructura de capítulos...");
+        log.debug("Esperando estructura de capítulos...");
         wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(getSelectorContenedorIndice())));
     }
 
@@ -62,7 +62,7 @@ public abstract class SitioWebConfig {
             try {
                 List<WebElement> paneles = driver.findElements(By.cssSelector("mat-expansion-panel-header"));
                 if (!paneles.isEmpty()) {
-                    log.info("Se detectaron {} volúmenes. Abriendo todos...", paneles.size());
+                    log.debug("Se detectaron {} volúmenes. Abriendo todos...", paneles.size());
                     for (WebElement panel : paneles) {
                         js.executeScript("arguments[0].click();", panel);
                         Thread.sleep(500);
@@ -72,10 +72,10 @@ public abstract class SitioWebConfig {
                 // Sin paneles agrupados (o no se pudieron abrir): seguimos con el scroll general.
             }
 
-            log.info("Cargando página completa...");
+            log.debug("Cargando página completa...");
             js.executeScript("window.scrollTo(0, document.body.scrollHeight);");
             Thread.sleep(1500);
-            log.info("Scroll finalizado. Extrayendo código fuente...");
+            log.debug("Scroll finalizado. Extrayendo código fuente...");
             return driver.getPageSource();
 
         } catch (Exception e) {
