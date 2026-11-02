@@ -125,7 +125,9 @@ class EditorEpubLibro {
             this.rutaEpub = archivoACargar.toPath();
             try {
                 EpubReader epubReader = new EpubReader();
-                this.libro = epubReader.readEpub(new FileInputStream(this.rutaEpub.toFile()));
+                try (FileInputStream fis = new FileInputStream(this.rutaEpub.toFile())) {
+                    this.libro = epubReader.readEpub(fis);
+                }
                 System.out.println("Archivo EPUB '" + archivoACargar.getName() + "' cargado con éxito.");
             } catch (IOException e) {
                 System.err.println(

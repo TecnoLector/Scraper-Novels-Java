@@ -9,12 +9,10 @@ import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Comparator;
 import java.util.Scanner;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import io.documentnode.epub4j.domain.Author;
 import io.documentnode.epub4j.domain.Book;
@@ -28,37 +26,11 @@ import io.documentnode.epub4j.epub.EpubWriter;
  * el EPUB resultante lleva una página de metadatos + las secciones del rango, y el título
  * recibe el sufijo "(Parte X de Y)". El mismo test debe seguir pasando tras mover la lógica
  * a su colaborador, porque el movimiento es verbatim.
- *
- * <p>Nota: no se usa {@code @TempDir} porque {@code mostrarMenuDividir} deja abierto el
- * {@code FileInputStream} del EPUB original (fuga preexistente que en Windows bloquea el
- * fichero). La carpeta se limpia best-effort tras forzar un GC.
  */
 class UtilidadesEpubDividirTest {
 
-    private Path carpeta;
-
-    @BeforeEach
-    void preparar() throws Exception {
-        carpeta = Files.createTempDirectory("util-epub-dividir");
-    }
-
-    @AfterEach
-    void limpiar() {
-        System.gc(); // anima a cerrar el FileInputStream que epub4j deja abierto
-        try {
-            Files.walk(carpeta)
-                 .sorted(Comparator.reverseOrder())
-                 .forEach(p -> {
-                     try {
-                         Files.deleteIfExists(p);
-                     } catch (Exception ignored) {
-                         // best-effort: el SO limpiará el temporal
-                     }
-                 });
-        } catch (Exception ignored) {
-            // best-effort
-        }
-    }
+    @TempDir
+    Path carpeta;
 
     private static String capituloXhtml(int n) {
         return "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!DOCTYPE html>\n"

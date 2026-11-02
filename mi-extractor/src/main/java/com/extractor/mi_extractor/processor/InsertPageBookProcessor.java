@@ -39,7 +39,9 @@ private static final Logger log = LoggerFactory.getLogger(InsertPageBookProcesso
         Book libroOriginal = null;
         try {
             estados.put(id, "Cargando EPUB original...");
-            libroOriginal = new EpubReader().readEpub(new FileInputStream(inputEpub.toFile()));
+            try (FileInputStream fis = new FileInputStream(inputEpub.toFile())) {
+                libroOriginal = new EpubReader().readEpub(fis);
+            }
         } catch (IOException e) {
             estados.put(id, "ERROR fatal al cargar el EPUB: " + e.getMessage());
             return;

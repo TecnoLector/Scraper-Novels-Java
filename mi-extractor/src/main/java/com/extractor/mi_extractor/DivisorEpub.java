@@ -85,7 +85,9 @@ private static final Logger log = LoggerFactory.getLogger(DivisorEpub.class);
         Book libroOriginal = null;
         try {
             System.out.println("Cargando EPUB original...");
-            libroOriginal = new EpubReader().readEpub(new FileInputStream(rutaEpubOriginal.toFile()));
+            try (FileInputStream fis = new FileInputStream(rutaEpubOriginal.toFile())) {
+                libroOriginal = new EpubReader().readEpub(fis);
+            }
             if (libroOriginal.getSpine().getSpineReferences() == null
                     || libroOriginal.getSpine().getSpineReferences().isEmpty()) {
                 System.err.println("Error: El EPUB original parece no tener contenido legible (spine vacío).");

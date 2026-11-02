@@ -34,7 +34,10 @@ public class SplitProcessor {
                                  Map<String, String> estados) {
         try {
             estados.put(id, "Cargando EPUB original...");
-            Book libroOriginal = new EpubReader().readEpub(new FileInputStream(inputOriginal.toFile()));
+            Book libroOriginal;
+            try (FileInputStream fis = new FileInputStream(inputOriginal.toFile())) {
+                libroOriginal = new EpubReader().readEpub(fis);
+            }
 
             // Crear una carpeta temporal para guardar los pedazos antes de comprimirlos
             Path tempDirPedazos = storage.crearCarpetaTemporal("pedazos_");
