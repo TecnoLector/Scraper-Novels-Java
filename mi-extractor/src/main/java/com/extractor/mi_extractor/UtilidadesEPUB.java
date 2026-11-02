@@ -1111,46 +1111,4 @@ public class UtilidadesEPUB {
             this.numeroCapituloAnterior = numeroCapituloAnterior;
         }
     }
-
-    public void convertirAEpub3ConCalibre(String rutaInput, String rutaOutput) {
-        try {
-            String rutaEjecutable = "C:\\Program Files\\Calibre2\\ebook-convert.exe";
-
-            File ejecutable = new File(rutaEjecutable);
-
-            if (!ejecutable.exists()) {
-                System.err.println("❌ Error: No encuentro el archivo 'ebook-convert.exe' en: " + rutaEjecutable);
-                System.err.println("Asegurate de que está instalado ahí.");
-                return;
-            }
-
-            System.out.println("✅ Usando motor de conversión: " + rutaEjecutable);
-
-            List<String> comando = new ArrayList<>();
-            comando.add(rutaEjecutable);
-            comando.add(rutaInput);
-            comando.add(rutaOutput);
-            comando.add("--epub-version");
-            comando.add("3");
-
-            ProcessBuilder pb = new ProcessBuilder(comando);
-            pb.inheritIO();
-
-            System.out.println("Convirtiendo a EPUB 3... Por favor espera.");
-            Process proceso = pb.start();
-
-            int codigoSalida = proceso.waitFor();
-
-            if (codigoSalida == 0) {
-                System.out.println("--¡Conversion exitosa!--");
-                System.out.println("Archivo guardado: " + rutaOutput);
-            } else {
-                System.err.println("Calibre fallo. Codigo de error: " + codigoSalida);
-            }
-
-        } catch (Exception e) {
-            System.err.println("Error al ejecutar: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
 }

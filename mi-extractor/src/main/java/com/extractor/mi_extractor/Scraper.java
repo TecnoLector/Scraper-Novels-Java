@@ -27,8 +27,6 @@ public class Scraper {
     private SitioWebConfig configActual;
     private boolean permisoAdquirido = false; // permiso del cupo global de navegadores
 
-    private final String selectorContenidoCapitulo = "div.skn-chp-chapter-content";
-
     public Scraper() {
 
         Properties props = new Properties();
@@ -199,74 +197,6 @@ public class Scraper {
             configActual = GestorSitios.obtenerConfig(driver.getCurrentUrl());
         }
         return configActual.extraerIndiceHtml(driver, js, wait);
-    }
-
-    private boolean esperarSelector(WebDriverWait waitLocal, String selector) {
-        if (selector == null || selector.isBlank()) {
-            return false;
-        }
-        try {
-            waitLocal.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(selector)));
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    private boolean activarPestanaCapitulos() {
-        cerrarAvisoPublicidad();
-        if (activarTabPorTextoCss("ul.nav-tabs a.nav-link", "contenido")) {
-            return true;
-        }
-        String[] xpaths = new String[] {
-                "//a[contains(translate(text(),'ÍÍÁÉÓÚ','IIAEOU'),'CAPITULO')]",
-                "//a[contains(translate(text(),'ÍÍÁÉÓÚ','IIAEOU'),'CAPITULOS')]",
-                "//a[contains(translate(text(),'ÍÍÁÉÓÚ','IIAEOU'),'INDICE')]",
-                "//a[contains(translate(text(),'ÍÍÁÉÓÚ','IIAEOU'),'CONTENIDO')]",
-                "//button[contains(translate(text(),'ÍÍÁÉÓÚ','IIAEOU'),'CAPITULO')]",
-                "//button[contains(translate(text(),'ÍÍÁÉÓÚ','IIAEOU'),'INDICE')]"
-        };
-        for (String xpath : xpaths) {
-            try {
-                List<WebElement> elementos = driver.findElements(By.xpath(xpath));
-                if (!elementos.isEmpty()) {
-                    WebElement boton = elementos.get(0);
-                    js.executeScript("arguments[0].click();", boton);
-                    Thread.sleep(1500);
-                    return true;
-                }
-            } catch (Exception e) {
-            }
-        }
-        return false;
-    }
-
-    private boolean activarTabPorTextoCss(String selector, String texto) {
-        try {
-            List<WebElement> elementos = driver.findElements(By.cssSelector(selector));
-            String textoNormalizado = texto.toLowerCase();
-            for (WebElement elemento : elementos) {
-                if (elemento.getText() != null && elemento.getText().toLowerCase().contains(textoNormalizado)) {
-                    js.executeScript("arguments[0].click();", elemento);
-                    Thread.sleep(1500);
-                    return true;
-                }
-            }
-        } catch (Exception e) {
-        }
-        return false;
-    }
-
-    private void cerrarAvisoPublicidad() {
-        try {
-            List<WebElement> botones = driver
-                    .findElements(By.cssSelector(".adblock-toast__btn, .adblock-toast__close"));
-            if (!botones.isEmpty()) {
-                js.executeScript("arguments[0].click();", botones.get(0));
-                Thread.sleep(500);
-            }
-        } catch (Exception e) {
-        }
     }
 
     public boolean irAlSiguienteCapitulo() {
