@@ -26,7 +26,7 @@ public class App {
             scanner.nextLine(); // Limpiar el buffer
 
             if (opcion == 1) {
-                MenuExtractor.iniciar(scanner); 
+                DescargaCli.iniciar(scanner);
             
             } else if (opcion == 2) {
                 EditorXHTML.iniciar(scanner);
