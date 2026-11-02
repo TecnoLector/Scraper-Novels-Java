@@ -113,7 +113,7 @@ public class MenuExtractor {
         System.out.println("Introduce la URL de la PORTADA de la novela:");
         String urlPortada = scanner.nextLine();
 
-        Map<Double, String> todosLosCapitulos = obtenerTodosLosCapitulos(urlPortada);
+        Map<Double, String> todosLosCapitulos = CatalogoCapitulos.obtener(urlPortada);
 
         ejecutarDescargaParalela(todosLosCapitulos, rutaNovelaStr, scanner);
     }
@@ -155,7 +155,7 @@ public class MenuExtractor {
         System.out.println("Introduce la URL de la PORTADA de la novela:");
         String urlPortada = scanner.nextLine();
 
-        Map<Double, String> todosLosCapitulos = obtenerTodosLosCapitulos(urlPortada);
+        Map<Double, String> todosLosCapitulos = CatalogoCapitulos.obtener(urlPortada);
 
         if (todosLosCapitulos.isEmpty()) {
             System.out.println("No se encontraron capítulos. Revisa la URL.");
@@ -186,7 +186,7 @@ public class MenuExtractor {
 
         System.out.println("Introduce los números de capítulo separados por comas (ej: 10, 2.1, 2.2):");
         String listaDeNumerosStr = scanner.nextLine();
-        Map<Double, String> todosLosCapitulos = obtenerTodosLosCapitulos(urlPortada);
+        Map<Double, String> todosLosCapitulos = CatalogoCapitulos.obtener(urlPortada);
 
         if (todosLosCapitulos.isEmpty()) {
             System.out.println("Error: No se pudieron obtener capítulos de esa URL.");
@@ -472,59 +472,6 @@ public class MenuExtractor {
         return 5.5;
     }
 
-    private static Map<Double, String> obtenerTodosLosCapitulos(String urlPortada) {
-    System.out.println("Obteniendo lista de capítulos...");
-    Map<Double, String> mapaTotal = new TreeMap<>();
-
-    Scraper scraper = new Scraper();
-    IndiceExtractor extractor = new IndiceExtractor();
-
-    String urlActual = urlPortada;
-    int pagina = 1;
-
-    try {
-    while (urlActual != null) {
-        System.out.println(">>> Analizando índice - Página " + pagina + "...");
-        scraper.navegarA(urlActual);
-
-        try {
-            Thread.sleep(2000);
-        } catch (InterruptedException e) {
-        }
-
-        String htmlIndice = scraper.obtenerHtmlDeIndice();
-        if (htmlIndice == null)
-            break;
-
-        Map<Double, String> capitulosPagina = extractor.extraerEnlaces(htmlIndice, urlActual);
-
-        if (capitulosPagina.isEmpty()) {
-            System.out.println("⚠ No se encontraron capítulos en la página " + pagina + ".");
-            if (pagina == 1)
-                break;
-        } else {
-            mapaTotal.putAll(capitulosPagina);
-            System.out.println("    -> Encontrados " + capitulosPagina.size() + " caps. (Total acumulado: "
-                    + mapaTotal.size() + ")");
-        }
-
-        String urlSiguiente = extractor.obtenerSiguientePagina(htmlIndice, urlActual);
-
-        if (urlSiguiente != null && !urlSiguiente.equals(urlActual)) {
-            System.out.println(">>> Detectada siguiente página: " + urlSiguiente);
-            urlActual = urlSiguiente;
-            pagina++;
-        } else {
-            System.out.println(">>> Fin del índice (No se detectaron más páginas).");
-            urlActual = null;
-        }
-    }
-    } finally {
-        scraper.cerrar(); // SIEMPRE cerrar, aunque el navegador haya muerto a mitad del índice.
-    }
-    return mapaTotal;
-}
-
     // ==============================================================
     // MÉTODO EXCLUSIVO PARA LA INTERFAZ WEB DE SPRING BOOT
     // ==============================================================
@@ -541,7 +488,7 @@ public class MenuExtractor {
             }
 
             progresoWeb.accept("15% - 🔍 Analizando índice de la novela...");
-            Map<Double, String> todosLosCapitulos = obtenerTodosLosCapitulos(url);
+            Map<Double, String> todosLosCapitulos = CatalogoCapitulos.obtener(url);
 
             // FILTRADO DE CAPÍTULOS (Lógica de Menú) — lógica pura extraída y testeable.
             Map<Double, String> filtrados = CapitulosUtil.filtrarCapitulos(todosLosCapitulos, opcion, limite, inicio, fin, listaStr);
