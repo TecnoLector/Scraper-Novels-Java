@@ -28,7 +28,7 @@ public class EscritorArchivo {
         
         // --- CAMBIO: Guardar dentro de OEBPS/Text ---
         Path rutaCompleta = Paths.get(rutaDeGuardadoBase, "OEBPS", "Text", nombreArchivo);
-        // Crear carpetas necesarias si no existen (aunque MenuExtractor ya debería haberlas creado)
+        // Crear carpetas necesarias si no existen (aunque DescargaWebService ya debería haberlas creado)
         Files.createDirectories(rutaCompleta.getParent()); 
         // --- FIN CAMBIO ---
 

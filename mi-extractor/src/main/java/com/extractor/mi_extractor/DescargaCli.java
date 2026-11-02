@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * Adaptador CLI de descarga: menú por consola y flujos de descarga (toda la novela, rango,
  * lista, un capítulo, secuencial) con el motor paralelo y la barra de progreso. Extraído de
- * {@link MenuExtractor} sin cambios de comportamiento. La parte web vive en MenuExtractor;
+ * {@link DescargaWebService} sin cambios de comportamiento. La parte web vive en DescargaWebService;
  * ambos comparten CatalogoCapitulos, CapitulosUtil, ReporteFaltantes y MotorDescargaParalela.
  */
 class DescargaCli {

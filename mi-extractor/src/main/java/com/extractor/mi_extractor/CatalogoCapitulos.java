@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Recorre el índice de una novela (paginado incluido) con el {@link Scraper} y devuelve el
- * mapa completo de capítulos (número -> URL). Extraído de {@link MenuExtractor} sin cambios
+ * mapa completo de capítulos (número -> URL). Extraído de {@link DescargaWebService} sin cambios
  * de comportamiento; lo usan CLI y web. El progreso va al log (no a stdout) para no ensuciar
  * la consola del servidor en las descargas web.
  */

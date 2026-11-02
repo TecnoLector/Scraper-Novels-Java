@@ -21,7 +21,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Crea la estructura base de un EPUB (mimetype, META-INF, OEBPS/...) y copia recursos del
- * JAR (hoja de estilos y fuentes). Extraído de {@link MenuExtractor} sin cambios de
+ * JAR (hoja de estilos y fuentes). Extraído de {@link DescargaWebService} sin cambios de
  * comportamiento; lo usan tanto el flujo CLI como el web.
  */
 class EstructuraEpubInicializador {

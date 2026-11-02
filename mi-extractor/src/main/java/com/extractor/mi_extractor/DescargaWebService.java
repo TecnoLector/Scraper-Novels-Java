@@ -13,7 +13,7 @@ import java.util.Map;
  * La parte CLI vive en {@link DescargaCli}; ambos comparten CatalogoCapitulos, CapitulosUtil,
  * ReporteFaltantes y MotorDescargaParalela.
  */
-public class MenuExtractor {
+public class DescargaWebService {
 
     // ==============================================================
     // MÉTODO EXCLUSIVO PARA LA INTERFAZ WEB DE SPRING BOOT

@@ -16,7 +16,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Motor único de descarga paralela (ADR-001). Contiene la ÚNICA copia del bucle que antes
- * estaba duplicado en {@code MenuExtractor.ejecutarDescargaParalela} (CLI) y
+ * estaba duplicado en {@code DescargaCli.ejecutarDescargaParalela} (CLI) y
  * {@code descargarWebMultiHilo} (Web). CLI y Web quedan como adaptadores delgados que lo
  * invocan con su propio callback de progreso.
  *

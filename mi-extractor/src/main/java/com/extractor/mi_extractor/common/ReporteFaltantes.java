@@ -9,7 +9,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Escribe el informe FALTANTES.txt tras una descarga, con dos secciones: capítulos VIP
- * (bloqueados) y fallos reales (no VIP). Extraído de {@link MenuExtractor} sin cambios de
+ * (bloqueados) y fallos reales (no VIP). Extraído de {@link DescargaWebService} sin cambios de
  * comportamiento; lo usan CLI y web.
  */
 public class ReporteFaltantes {

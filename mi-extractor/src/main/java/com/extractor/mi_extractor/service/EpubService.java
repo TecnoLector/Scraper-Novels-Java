@@ -1,7 +1,7 @@
 package com.extractor.mi_extractor.service;
 import com.extractor.mi_extractor.common.StorageService;
 
-import com.extractor.mi_extractor.MenuExtractor;
+import com.extractor.mi_extractor.DescargaWebService;
 import com.extractor.mi_extractor.processor.CalibreProcessor;
 import com.extractor.mi_extractor.processor.InsertPageBookProcessor;
 import com.extractor.mi_extractor.processor.ZipArchiveProcessor;
@@ -145,7 +145,7 @@ public class EpubService {
         CompletableFuture.runAsync(() -> {
             try {
                 Path rutaTemp = storage.crearCarpetaTemporal("extraccion_");
-                MenuExtractor extractor = new MenuExtractor();
+                DescargaWebService extractor = new DescargaWebService();
 
                 Path carpetaResultante = extractor.descargarWebMultiHilo(
                     opcion,

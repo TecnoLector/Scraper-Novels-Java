@@ -8,7 +8,7 @@ import java.util.regex.Pattern;
 /**
  * Utilidades puras sobre el mapa de capítulos (número -> URL): filtrado por opción,
  * extracción del número desde el título y formateo decimal-safe. Extraído de
- * {@link MenuExtractor} sin cambios de comportamiento; lo usan CLI y web.
+ * {@link DescargaWebService} sin cambios de comportamiento; lo usan CLI y web.
  */
 public class CapitulosUtil {
 
