@@ -16,6 +16,9 @@ import java.nio.file.StandardCopyOption;
 import java.util.Collections;
 import java.util.stream.Stream;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Crea la estructura base de un EPUB (mimetype, META-INF, OEBPS/...) y copia recursos del
  * JAR (hoja de estilos y fuentes). Extraído de {@link MenuExtractor} sin cambios de
@@ -23,11 +26,13 @@ import java.util.stream.Stream;
  */
 class EstructuraEpubInicializador {
 
+    private static final Logger log = LoggerFactory.getLogger(EstructuraEpubInicializador.class);
+
     static void inicializar(Path rutaBase) throws IOException {
         Path rutaMimetype = rutaBase.resolve("mimetype");
 
         if (Files.notExists(rutaMimetype)) {
-            System.out.println("Detectada carpeta nueva o incompleta. Creando estructura EPUB base...");
+            log.info("Detectada carpeta nueva o incompleta. Creando estructura EPUB base...");
 
             Files.createDirectories(rutaBase.resolve("META-INF"));
             Path rutaOEBPS = rutaBase.resolve("OEBPS");
@@ -42,7 +47,7 @@ class EstructuraEpubInicializador {
 
             copiarRecursoDesdeJar("/recursos/stylesheet.css", rutaStyles.resolve("stylesheet.css"));
 
-            System.out.println("Buscando y copiando fuentes (.ttf, .otf)...");
+            log.info("Buscando y copiando fuentes (.ttf, .otf)...");
             try {
                 String rutaJarFonts = "/recursos/fonts";
                 URL urlFonts = EstructuraEpubInicializador.class.getResource(rutaJarFonts);
@@ -83,17 +88,16 @@ class EstructuraEpubInicializador {
                     // }
 
                 } else {
-                    System.err.println("ADVERTENCIA: No se encontró la carpeta de recursos '/recursos/fonts'.");
+                    log.warn("No se encontró la carpeta de recursos '/recursos/fonts'.");
                 }
 
             } catch (URISyntaxException | IOException e) {
-                System.err.println("Error al intentar listar o copiar fuentes: " + e.getMessage());
-                e.printStackTrace(); // Mostrar más detalles del error
+                log.warn("Error al intentar listar o copiar fuentes: {}", e.getMessage(), e);
             }
 
-            System.out.println("¡Estructura EPUB base creada con éxito!");
+            log.info("¡Estructura EPUB base creada con éxito!");
         } else {
-            System.out.println("Estructura EPUB detectada. Añadiendo capítulos...");
+            log.info("Estructura EPUB detectada. Añadiendo capítulos...");
         }
     }
 
@@ -103,14 +107,14 @@ class EstructuraEpubInicializador {
     private static void copiarRecursoDesdeJar(String rutaEnJar, Path rutaDestino) {
         try (InputStream is = EstructuraEpubInicializador.class.getResourceAsStream(rutaEnJar)) {
             if (is == null) {
-                System.err.println("ADVERTENCIA: Recurso no encontrado en el JAR: " + rutaEnJar);
+                log.warn("Recurso no encontrado en el JAR: {}", rutaEnJar);
                 return;
             }
             Files.createDirectories(rutaDestino.getParent());
             Files.copy(is, rutaDestino, StandardCopyOption.REPLACE_EXISTING);
-            System.out.println("Recurso copiado a: " + rutaDestino);
+            log.info("Recurso copiado a: {}", rutaDestino);
         } catch (IOException | NullPointerException e) {
-            System.err.println("Error al copiar recurso '" + rutaEnJar + "': " + e.getMessage());
+            log.warn("Error al copiar recurso '{}': {}", rutaEnJar, e.getMessage());
         }
     }
 }

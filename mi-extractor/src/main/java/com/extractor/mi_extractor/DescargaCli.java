@@ -1,5 +1,8 @@
 package com.extractor.mi_extractor;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,6 +19,7 @@ import java.util.concurrent.TimeUnit;
  * ambos comparten CatalogoCapitulos, CapitulosUtil, ReporteFaltantes y MotorDescargaParalela.
  */
 class DescargaCli {
+private static final Logger log = LoggerFactory.getLogger(DescargaCli.class);
 
     public static void iniciar(Scanner scanner) {
         long tiempoInicio = System.currentTimeMillis();
@@ -48,7 +52,7 @@ class DescargaCli {
             EstructuraEpubInicializador.inicializar(rutaNovela);
         } catch (IOException e) {
             System.err.println("Error CRÍTICO al crear carpeta de novela o inicializar estructura: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Excepción no controlada", e);
             return;
         }
 
@@ -85,7 +89,7 @@ class DescargaCli {
             }
         } catch (Exception e) {
             System.err.println("¡Error crítico en el menú!");
-            e.printStackTrace();
+            log.error("Excepción no controlada", e);
         }
 
         long tiempoFin = System.currentTimeMillis();
@@ -133,7 +137,7 @@ class DescargaCli {
             }
         } catch (Exception e) {
             System.err.println("Ocurrió un error al buscar el capítulo: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Excepción no controlada", e);
         } finally {
             scraper.cerrar();
         }

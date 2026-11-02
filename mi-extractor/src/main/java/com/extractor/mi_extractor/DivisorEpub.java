@@ -1,5 +1,8 @@
 package com.extractor.mi_extractor;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -32,6 +35,7 @@ import io.documentnode.epub4j.epub.EpubWriter;
  * carpeta de trabajo.
  */
 class DivisorEpub {
+private static final Logger log = LoggerFactory.getLogger(DivisorEpub.class);
 
     private final Scanner scanner;
     private final String rutaCarpeta;
@@ -165,7 +169,7 @@ class DivisorEpub {
             System.out.println("¡Éxito! Se ha creado el archivo: " + nombreNuevo);
         } catch (IOException e) {
             System.err.println("Error al crear el EPUB dividido: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Excepción no controlada", e);
         }
     }
 

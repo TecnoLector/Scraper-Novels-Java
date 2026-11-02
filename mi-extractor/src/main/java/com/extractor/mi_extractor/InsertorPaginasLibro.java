@@ -1,5 +1,8 @@
 package com.extractor.mi_extractor;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -29,6 +32,7 @@ import io.documentnode.epub4j.epub.EpubWriter;
  * sin cambios de comportamiento. Conserva el mismo estado: el {@link Scanner} y la carpeta.
  */
 class InsertorPaginasLibro {
+private static final Logger log = LoggerFactory.getLogger(InsertorPaginasLibro.class);
 
     private final Scanner scanner;
     private final String rutaCarpeta;
@@ -187,7 +191,7 @@ class InsertorPaginasLibro {
             System.out.println("\n¡Éxito! Se ha creado el archivo modificado: " + nombreEpubNuevo);
         } catch (IOException e) {
             System.err.println("Error al guardar el EPUB modificado: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Excepción no controlada", e);
         }
     }
 

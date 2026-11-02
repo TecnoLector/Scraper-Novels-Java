@@ -1,5 +1,8 @@
 package com.extractor.mi_extractor;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -17,6 +20,7 @@ import java.util.zip.ZipOutputStream;
  * {@link UtilidadesEPUB} sin cambios de comportamiento. Conserva el mismo estado.
  */
 class ReempaquetadorEpub {
+private static final Logger log = LoggerFactory.getLogger(ReempaquetadorEpub.class);
 
     private final Scanner scanner;
     private final String rutaCarpeta;
@@ -114,7 +118,7 @@ class ReempaquetadorEpub {
 
         } catch (IOException e) {
             System.err.println("Error al crear el archivo EPUB: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Excepción no controlada", e);
         }
     }
 }

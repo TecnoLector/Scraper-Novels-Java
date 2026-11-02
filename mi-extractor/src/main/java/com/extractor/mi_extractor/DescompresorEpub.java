@@ -1,5 +1,8 @@
 package com.extractor.mi_extractor;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.BufferedInputStream;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -16,6 +19,7 @@ import java.util.zip.ZipInputStream;
  * comportamiento. Conserva el mismo estado: el {@link Scanner} y la carpeta de trabajo.
  */
 class DescompresorEpub {
+private static final Logger log = LoggerFactory.getLogger(DescompresorEpub.class);
 
     private final Scanner scanner;
     private final String rutaCarpeta;
@@ -91,7 +95,7 @@ class DescompresorEpub {
 
         } catch (IOException e) {
             System.err.println("Error al descomprimir el EPUB: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Excepción no controlada", e);
         }
     }
 }

@@ -1,5 +1,8 @@
 package com.extractor.mi_extractor.processor;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -25,6 +28,7 @@ import io.documentnode.epub4j.epub.EpubWriter;
 
 @Component
 public class InsertPageBookProcessor {
+private static final Logger log = LoggerFactory.getLogger(InsertPageBookProcessor.class);
 
     // 1. Cambiamos los parámetros para recibir los datos de la web en vez de Scanner
     public void insertarPaginasDeLibro(String id, Path inputEpub, Path outputEpub, 
@@ -135,7 +139,7 @@ public class InsertPageBookProcessor {
             
         } catch (IOException e) {
             estados.put(id, "ERROR al guardar el EPUB modificado: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Excepción no controlada", e);
         }
     }
 

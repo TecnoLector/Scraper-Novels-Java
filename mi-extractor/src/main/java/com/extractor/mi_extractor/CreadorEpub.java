@@ -1,5 +1,8 @@
 package com.extractor.mi_extractor;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -28,6 +31,7 @@ import io.documentnode.epub4j.epub.EpubWriter;
  * carpeta; no toca el EPUB cargado en memoria del editor.
  */
 class CreadorEpub {
+private static final Logger log = LoggerFactory.getLogger(CreadorEpub.class);
 
     private final java.util.Scanner scanner;
     private final String rutaCarpeta;
@@ -261,7 +265,7 @@ class CreadorEpub {
 
         } catch (IOException e) {
             System.err.println("Error al crear el EPUB: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Excepción no controlada", e);
         }
     }
 
@@ -409,7 +413,7 @@ class CreadorEpub {
 
         } catch (IOException e) {
             System.err.println("Error al crear el archivo EPUB: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Excepción no controlada", e);
         }
     }
 
