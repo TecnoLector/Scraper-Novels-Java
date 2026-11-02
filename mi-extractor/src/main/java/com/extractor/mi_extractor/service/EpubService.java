@@ -1,4 +1,5 @@
 package com.extractor.mi_extractor.service;
+import com.extractor.mi_extractor.common.StorageService;
 
 import com.extractor.mi_extractor.MenuExtractor;
 import com.extractor.mi_extractor.processor.CalibreProcessor;

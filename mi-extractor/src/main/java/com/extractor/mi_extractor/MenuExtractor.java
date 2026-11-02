@@ -1,4 +1,6 @@
 package com.extractor.mi_extractor;
+import com.extractor.mi_extractor.common.ReporteFaltantes;
+import com.extractor.mi_extractor.common.CapitulosUtil;
 
 import java.util.function.Consumer;
 import java.nio.file.Files;

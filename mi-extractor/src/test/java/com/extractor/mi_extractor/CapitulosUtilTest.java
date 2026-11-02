@@ -1,4 +1,5 @@
 package com.extractor.mi_extractor;
+import com.extractor.mi_extractor.common.CapitulosUtil;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;

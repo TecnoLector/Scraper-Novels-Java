@@ -1,4 +1,4 @@
-package com.extractor.mi_extractor.service;
+package com.extractor.mi_extractor.common;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;

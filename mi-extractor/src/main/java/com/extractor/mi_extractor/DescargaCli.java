@@ -1,4 +1,6 @@
 package com.extractor.mi_extractor;
+import com.extractor.mi_extractor.common.ReporteFaltantes;
+import com.extractor.mi_extractor.common.CapitulosUtil;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

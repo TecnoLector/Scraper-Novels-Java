@@ -1,6 +1,6 @@
 package com.extractor.mi_extractor.processor;
+import com.extractor.mi_extractor.common.StorageService;
 
-import com.extractor.mi_extractor.service.StorageService;
 import io.documentnode.epub4j.domain.*;
 import io.documentnode.epub4j.epub.EpubReader;
 import io.documentnode.epub4j.epub.EpubWriter;

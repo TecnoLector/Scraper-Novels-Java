@@ -1,4 +1,4 @@
-package com.extractor.mi_extractor;
+package com.extractor.mi_extractor.common;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -10,13 +10,13 @@ import java.util.regex.Pattern;
  * extracción del número desde el título y formateo decimal-safe. Extraído de
  * {@link MenuExtractor} sin cambios de comportamiento; lo usan CLI y web.
  */
-class CapitulosUtil {
+public class CapitulosUtil {
 
     private CapitulosUtil() {
     }
 
     /** Une los números de capítulo exactos (decimales incluidos) separados por coma. */
-    static String formatearListaCaps(java.util.Collection<Double> caps) {
+    public static String formatearListaCaps(java.util.Collection<Double> caps) {
         StringBuilder sb = new StringBuilder();
         for (Double cap : caps) {
             if (sb.length() > 0) {
@@ -28,14 +28,14 @@ class CapitulosUtil {
     }
 
     /** Muestra 15 (entero) o 15.1 (decimal); NUNCA inventa un entero a partir de un decimal. */
-    static String formatearNumeroCap(double cap) {
+    public static String formatearNumeroCap(double cap) {
         if (cap == Math.floor(cap) && !Double.isInfinite(cap)) {
             return String.valueOf((long) cap);
         }
         return String.valueOf(cap);
     }
 
-    static Map<Double, String> filtrarCapitulos(Map<Double, String> todosLosCapitulos, int opcion,
+    public static Map<Double, String> filtrarCapitulos(Map<Double, String> todosLosCapitulos, int opcion,
             int limite, int inicio, int fin, String listaStr) {
         Map<Double, String> filtrados = new HashMap<>();
         if (todosLosCapitulos == null) {
@@ -74,7 +74,7 @@ class CapitulosUtil {
         return filtrados;
     }
 
-    static double extraerNumeroDeTitulo(String titulo) {
+    public static double extraerNumeroDeTitulo(String titulo) {
         if (titulo == null)
             return 0.0;
         Pattern pattern = Pattern.compile("\\d+(\\.\\d+)?");

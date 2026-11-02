@@ -1,4 +1,4 @@
-package com.extractor.mi_extractor;
+package com.extractor.mi_extractor.common;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -12,7 +12,7 @@ import org.slf4j.LoggerFactory;
  * (bloqueados) y fallos reales (no VIP). Extraído de {@link MenuExtractor} sin cambios de
  * comportamiento; lo usan CLI y web.
  */
-class ReporteFaltantes {
+public class ReporteFaltantes {
 
     private static final Logger log = LoggerFactory.getLogger(ReporteFaltantes.class);
 
@@ -20,7 +20,7 @@ class ReporteFaltantes {
     }
 
     /** Escribe FALTANTES.txt con dos secciones: VIP (bloqueados) y fallos reales (no VIP). */
-    static void escribir(Path pathBase, Set<Double> faltantes, Set<Double> vip) {
+    public static void escribir(Path pathBase, Set<Double> faltantes, Set<Double> vip) {
         try {
             StringBuilder sb = new StringBuilder();
             if (!vip.isEmpty()) {
