@@ -17,9 +17,13 @@ import java.util.UUID;
 import java.util.stream.Stream;
 import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.parser.Parser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -345,5 +349,264 @@ public class EmpaquetadorEpub3 {
         zos.putNextEntry(e);
         zos.write(datos);
         zos.closeEntry();
+    }
+
+    // ---------------------------------------------------------------------------------------
+    //  Conversión EPUB 2 -> EPUB 3 (genera un fichero NUEVO; no toca el original)
+    // ---------------------------------------------------------------------------------------
+
+    /**
+     * Convierte un EPUB 2 a EPUB 3: sube el OPF a 3.0, añade {@code dcterms:modified} y
+     * {@code dc:identifier} si faltan, genera {@code nav.xhtml} (desde el {@code toc.ncx} o, si no
+     * hay, desde el spine) y lo añade al manifest con {@code properties="nav"}, conserva el ncx y
+     * reempaqueta con {@code mimetype} STORED primero.
+     */
+    public void convertirEpub2aEpub3(Path entrada, Path salida) throws IOException {
+        // 1. Cargar todas las entradas en memoria.
+        Map<String, byte[]> entradas = new LinkedHashMap<>();
+        try (ZipInputStream zis = new ZipInputStream(Files.newInputStream(entrada))) {
+            ZipEntry e;
+            while ((e = zis.getNextEntry()) != null) {
+                if (!e.isDirectory()) {
+                    entradas.put(e.getName(), zis.readAllBytes());
+                }
+            }
+        }
+
+        // 2. Localizar el OPF vía META-INF/container.xml.
+        byte[] containerBytes = entradas.get("META-INF/container.xml");
+        if (containerBytes == null) {
+            throw new IOException("No es un EPUB válido: falta META-INF/container.xml");
+        }
+        String opfPath = rutaRootfile(new String(containerBytes, StandardCharsets.UTF_8));
+        if (opfPath == null) {
+            throw new IOException("container.xml no indica el OPF (rootfile full-path).");
+        }
+        byte[] opfBytes = entradas.get(opfPath);
+        if (opfBytes == null) {
+            throw new IOException("No se encontró el OPF indicado en container.xml: " + opfPath);
+        }
+        String opfDir = opfPath.contains("/") ? opfPath.substring(0, opfPath.lastIndexOf('/') + 1) : "";
+
+        // 3. Parsear y actualizar el OPF. Tolerante a prefijos de namespace: epub4j escribe
+        //    <opf:package>/<opf:manifest>/..., mientras que Sigil suele usarlos sin prefijo.
+        Document opf = Jsoup.parse(new String(opfBytes, StandardCharsets.UTF_8), "", Parser.xmlParser());
+        Element pkg = primero(opf, "package");
+        if (pkg == null) {
+            throw new IOException("OPF inválido: no se encontró <package>.");
+        }
+        String prefijo = prefijoDe(pkg); // "opf:" o ""
+        Element metadata = primero(opf, "metadata");
+        Element manifest = primero(opf, "manifest");
+        Element spine = primero(opf, "spine");
+        if (metadata == null || manifest == null || spine == null) {
+            throw new IOException("OPF incompleto (falta metadata/manifest/spine).");
+        }
+
+        pkg.attr("version", "3.0");
+        asegurarIdentificador(opf, pkg, metadata);
+
+        // dcterms:modified (requerido en EPUB 3), con el mismo prefijo que el resto del OPF.
+        boolean tieneModified = todos(opf, "meta").stream()
+                .anyMatch(m -> "dcterms:modified".equals(m.attr("property")));
+        if (!tieneModified) {
+            Element meta = opf.createElement(prefijo + "meta");
+            meta.attr("property", "dcterms:modified");
+            meta.text(FECHA_UTC.format(Instant.now()));
+            metadata.appendChild(meta);
+        }
+
+        String idioma = textoTag(opf, "language");
+        if (idioma.isBlank()) {
+            idioma = "es";
+        }
+
+        // nav: si no hay un item con properties="nav", generarlo (conservando el ncx).
+        boolean tieneNav = todos(manifest, "item").stream()
+                .anyMatch(it -> tieneToken(it.attr("properties"), "nav"));
+        if (!tieneNav) {
+            List<String[]> navEntries = entradasNav(entradas, manifest, spine, opfDir);
+            Metadatos m = new Metadatos();
+            m.idioma = idioma;
+            String navHtml = construirNav(m, navEntries);
+            entradas.put(opfDir + "nav.xhtml", navHtml.getBytes(StandardCharsets.UTF_8));
+
+            Element item = opf.createElement(prefijo + "item");
+            item.attr("id", idManifestLibre(manifest, "nav"));
+            item.attr("href", "nav.xhtml");
+            item.attr("media-type", "application/xhtml+xml");
+            item.attr("properties", "nav");
+            manifest.appendChild(item);
+        }
+
+        // 4. Serializar el OPF de vuelta.
+        opf.outputSettings().syntax(Document.OutputSettings.Syntax.xml).prettyPrint(false).charset("UTF-8");
+        entradas.put(opfPath, opf.outerHtml().getBytes(StandardCharsets.UTF_8));
+
+        // 5. Reempaquetar (mimetype STORED primero).
+        Files.createDirectories(salida.getParent());
+        try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(salida.toFile()))) {
+            escribirStored(zos, "mimetype", "application/epub+zip".getBytes(StandardCharsets.US_ASCII));
+            for (Map.Entry<String, byte[]> en : entradas.entrySet()) {
+                if (en.getKey().equals("mimetype")) {
+                    continue;
+                }
+                escribirDeflated(zos, en.getKey(), en.getValue());
+            }
+        }
+        log.info("EPUB 2 -> 3 convertido: {}", salida);
+    }
+
+    private static String rutaRootfile(String containerXml) {
+        try {
+            Document doc = Jsoup.parse(containerXml, "", Parser.xmlParser());
+            Element rf = doc.selectFirst("rootfile");
+            if (rf != null && !rf.attr("full-path").isBlank()) {
+                return rf.attr("full-path");
+            }
+        } catch (Exception e) {
+            log.warn("No se pudo leer container.xml: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    private static void asegurarIdentificador(Document opf, Element pkg, Element metadata) {
+        String uid = pkg.attr("unique-identifier");
+        boolean existe = !uid.isBlank()
+                && todos(opf, "identifier").stream().anyMatch(id -> uid.equals(id.attr("id")));
+        if (!existe) {
+            Element id = opf.createElement("dc:identifier");
+            id.attr("id", "bookid");
+            id.text("urn:uuid:" + UUID.randomUUID());
+            metadata.appendChild(id);
+            pkg.attr("unique-identifier", "bookid");
+        }
+    }
+
+    private static String textoTag(Document opf, String local) {
+        Element el = primero(opf, local);
+        return (el != null) ? el.text().trim() : "";
+    }
+
+    /** Nombre local de un tag, sin prefijo de namespace ("opf:item" -> "item"). */
+    private static String localName(Element el) {
+        String t = el.tagName();
+        int i = t.indexOf(':');
+        return (i >= 0) ? t.substring(i + 1) : t;
+    }
+
+    /** Prefijo de namespace de un tag ("opf:package" -> "opf:"; "package" -> ""). */
+    private static String prefijoDe(Element el) {
+        String t = el.tagName();
+        int i = t.indexOf(':');
+        return (i >= 0) ? t.substring(0, i + 1) : "";
+    }
+
+    /** Primer descendiente (o el propio) cuyo nombre local coincide, ignorando prefijo. */
+    private static Element primero(Element raiz, String local) {
+        for (Element el : raiz.getAllElements()) {
+            if (localName(el).equalsIgnoreCase(local)) {
+                return el;
+            }
+        }
+        return null;
+    }
+
+    /** Todos los elementos cuyo nombre local coincide, ignorando prefijo. */
+    private static List<Element> todos(Element raiz, String local) {
+        List<Element> res = new ArrayList<>();
+        for (Element el : raiz.getAllElements()) {
+            if (localName(el).equalsIgnoreCase(local)) {
+                res.add(el);
+            }
+        }
+        return res;
+    }
+
+    private static boolean tieneToken(String valor, String token) {
+        if (valor == null || valor.isBlank()) {
+            return false;
+        }
+        for (String t : valor.trim().split("\\s+")) {
+            if (t.equals(token)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String idManifestLibre(Element manifest, String base) {
+        java.util.Set<String> usados = new java.util.HashSet<>();
+        for (Element it : todos(manifest, "item")) {
+            usados.add(it.attr("id"));
+        }
+        if (!usados.contains(base)) {
+            return base;
+        }
+        int n = 1;
+        while (usados.contains(base + n)) {
+            n++;
+        }
+        return base + n;
+    }
+
+    /** Entradas de navegación para el nav: primero desde toc.ncx; si no hay, desde el spine. */
+    private static List<String[]> entradasNav(Map<String, byte[]> entradas, Element manifest,
+            Element spine, String opfDir) {
+        List<String[]> res = new ArrayList<>();
+
+        String ncxHref = null;
+        for (Element it : todos(manifest, "item")) {
+            if ("application/x-dtbncx+xml".equals(it.attr("media-type"))) {
+                ncxHref = it.attr("href");
+                break;
+            }
+        }
+        if (ncxHref != null) {
+            byte[] ncxBytes = entradas.get(opfDir + ncxHref);
+            if (ncxBytes != null) {
+                try {
+                    Document ncx = Jsoup.parse(new String(ncxBytes, StandardCharsets.UTF_8), "", Parser.xmlParser());
+                    for (Element np : todos(ncx, "navPoint")) {
+                        Element content = primero(np, "content");
+                        Element label = primero(np, "navLabel");
+                        if (content != null && !content.attr("src").isBlank()) {
+                            String src = content.attr("src");
+                            String txt = (label != null && !label.text().isBlank()) ? label.text().trim() : src;
+                            res.add(new String[] { src, txt });
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("No se pudo leer toc.ncx: {}", e.getMessage());
+                }
+            }
+        }
+
+        if (res.isEmpty()) {
+            Map<String, String> hrefPorId = new LinkedHashMap<>();
+            for (Element it : todos(manifest, "item")) {
+                hrefPorId.put(it.attr("id"), it.attr("href"));
+            }
+            for (Element ref : todos(spine, "itemref")) {
+                String href = hrefPorId.get(ref.attr("idref"));
+                if (href == null) {
+                    continue;
+                }
+                String label = href;
+                byte[] b = entradas.get(opfDir + href);
+                if (b != null) {
+                    try {
+                        String t = Jsoup.parse(new String(b, StandardCharsets.UTF_8)).title();
+                        if (t != null && !t.isBlank()) {
+                            label = t.trim();
+                        }
+                    } catch (Exception ignore) {
+                        // usamos el href como etiqueta
+                    }
+                }
+                res.add(new String[] { href, label });
+            }
+        }
+        return res;
     }
 }

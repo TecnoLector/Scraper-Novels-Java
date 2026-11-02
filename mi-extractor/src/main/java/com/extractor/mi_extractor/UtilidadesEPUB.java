@@ -65,7 +65,8 @@ public class UtilidadesEPUB {
             System.out.println("2. Descomprimir un EPUB");
             System.out.println("3. Re-empaquetar carpeta como EPUB");
             System.out.println("4. Insertar paginas de 'Inicio de Libro'");
-            System.out.println("5. Convetir EPUB de v2 a v3");
+            System.out.println("5. Convertir un EPUB de v2 a v3 (nativo)");
+            System.out.println("6. Convertir TODOS los EPUB de la carpeta a v3 (nativo)");
             System.out.println("0. Volver al menú principal");
             System.out.print("Elige una herramienta: ");
 
@@ -119,13 +120,51 @@ public class UtilidadesEPUB {
                         break;
                     }
 
-                    // Si llegamos aquí, el archivo existe. Ejecutamos Calibre.
-                    convertirAEpub3ConCalibre(rutaInput.toString(), rutaOutput.toString());
+                    // Conversión NATIVA (sin Calibre): genera un .epub v3 NUEVO, no toca el original.
+                    try {
+                        new EmpaquetadorEpub3().convertirEpub2aEpub3(rutaInput, rutaOutput);
+                        System.out.println("\n✅ EPUB 3 creado: " + rutaOutput.toAbsolutePath());
+                    } catch (Exception ex) {
+                        System.err.println("❌ Error al convertir a EPUB 3: " + ex.getMessage());
+                    }
+                    break;
+                case 6:
+                    convertirTodosAEpub3();
                     break;
                 default:
                     System.out.println("Opción no válida.");
             }
         }
+    }
+
+    /** Convierte a EPUB 3 todos los .epub de la carpeta (saltando los que ya son *_v3.epub). */
+    private void convertirTodosAEpub3() {
+        File carpeta = new File(this.rutaCarpeta);
+        File[] epubs = carpeta.listFiles((dir, name) -> {
+            String n = name.toLowerCase();
+            return n.endsWith(".epub") && !n.endsWith("_v3.epub");
+        });
+        if (epubs == null || epubs.length == 0) {
+            System.out.println("No hay archivos .epub (sin _v3) en la carpeta.");
+            return;
+        }
+        System.out.println("Convirtiendo " + epubs.length + " EPUB a v3...");
+        EmpaquetadorEpub3 emp = new EmpaquetadorEpub3();
+        int ok = 0;
+        int fallos = 0;
+        for (File f : epubs) {
+            String base = f.getName().substring(0, f.getName().length() - 5); // quita ".epub"
+            Path salida = Paths.get(this.rutaCarpeta, base + "_v3.epub");
+            try {
+                emp.convertirEpub2aEpub3(f.toPath(), salida);
+                System.out.println("  ✓ " + f.getName() + " -> " + salida.getFileName());
+                ok++;
+            } catch (Exception e) {
+                System.err.println("  ✗ " + f.getName() + ": " + e.getMessage());
+                fallos++;
+            }
+        }
+        System.out.println("Hecho. Convertidos: " + ok + ", fallos: " + fallos);
     }
 
     // ---Submenú para Dividir EPUB ---

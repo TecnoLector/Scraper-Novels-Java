@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -131,5 +132,96 @@ class EmpaquetadorEpub3Test {
             }
         }
         return "";
+    }
+
+    @Test
+    void convierteEpub2AEpub3ConNavYConservaNcx() throws Exception {
+        Path v2 = tmp.resolve("libro_v2.epub");
+        crearEpub2Minimo(v2);
+
+        Path v3 = tmp.resolve("libro_v2_v3.epub");
+        new EmpaquetadorEpub3().convertirEpub2aEpub3(v2, v3);
+
+        Map<String, String> c = new HashMap<>();
+        String primera = null;
+        int primerMetodo = -1;
+        try (ZipInputStream zis = new ZipInputStream(Files.newInputStream(v3))) {
+            ZipEntry e;
+            boolean first = true;
+            while ((e = zis.getNextEntry()) != null) {
+                if (first) {
+                    primera = e.getName();
+                    primerMetodo = e.getMethod();
+                    first = false;
+                }
+                c.put(e.getName(), new String(zis.readAllBytes(), StandardCharsets.UTF_8));
+            }
+        }
+
+        assertEquals("mimetype", primera);
+        assertEquals(ZipEntry.STORED, primerMetodo);
+
+        String opf = c.get("OEBPS/content.opf");
+        assertTrue(opf.contains("version=\"3.0\""), "el OPF debe quedar en 3.0");
+        assertTrue(opf.contains("properties=\"nav\""), "debe añadirse el item nav");
+        assertTrue(opf.contains("dcterms:modified"), "debe añadirse dcterms:modified");
+
+        assertTrue(c.containsKey("OEBPS/nav.xhtml"), "debe generarse nav.xhtml");
+        assertTrue(c.get("OEBPS/nav.xhtml").contains("epub:type=\"toc\""));
+        assertTrue(c.get("OEBPS/nav.xhtml").contains("Capitulo 1"), "el nav toma el título del ncx");
+
+        assertTrue(c.containsKey("OEBPS/toc.ncx"), "se conserva el toc.ncx");
+        assertTrue(c.containsKey("OEBPS/Text/c1.xhtml"), "se conserva el contenido");
+    }
+
+    /** Escribe un EPUB 2 mínimo válido (OPF 2.0 + toc.ncx) en {@code destino}. */
+    private static void crearEpub2Minimo(Path destino) throws Exception {
+        Map<String, String> files = new java.util.LinkedHashMap<>();
+        files.put("META-INF/container.xml",
+                "<?xml version=\"1.0\"?>\n<container version=\"1.0\" "
+              + "xmlns=\"urn:oasis:names:tc:opendocument:xmlns:container\">"
+              + "<rootfiles><rootfile full-path=\"OEBPS/content.opf\" "
+              + "media-type=\"application/oebps-package+xml\"/></rootfiles></container>");
+        files.put("OEBPS/content.opf",
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+              + "<package xmlns=\"http://www.idpf.org/2007/opf\" version=\"2.0\" unique-identifier=\"bookid\">"
+              + "<metadata xmlns:dc=\"http://purl.org/dc/elements/1.1/\">"
+              + "<dc:identifier id=\"bookid\">urn:uuid:abc</dc:identifier>"
+              + "<dc:title>Libro V2</dc:title><dc:language>es</dc:language></metadata>"
+              + "<manifest>"
+              + "<item id=\"ncx\" href=\"toc.ncx\" media-type=\"application/x-dtbncx+xml\"/>"
+              + "<item id=\"c1\" href=\"Text/c1.xhtml\" media-type=\"application/xhtml+xml\"/>"
+              + "</manifest><spine toc=\"ncx\"><itemref idref=\"c1\"/></spine></package>");
+        files.put("OEBPS/toc.ncx",
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+              + "<ncx xmlns=\"http://www.daisy.org/z3986/2005/ncx/\" version=\"2005-1\">"
+              + "<head><meta name=\"dtb:uid\" content=\"urn:uuid:abc\"/></head>"
+              + "<docTitle><text>Libro V2</text></docTitle>"
+              + "<navMap><navPoint id=\"np1\" playOrder=\"1\"><navLabel><text>Capitulo 1</text></navLabel>"
+              + "<content src=\"Text/c1.xhtml\"/></navPoint></navMap></ncx>");
+        files.put("OEBPS/Text/c1.xhtml",
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?><!DOCTYPE html>"
+              + "<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta charset=\"utf-8\"/>"
+              + "<title>Capitulo 1</title></head><body><p>x</p></body></html>");
+
+        try (ZipOutputStream zos = new ZipOutputStream(Files.newOutputStream(destino))) {
+            // mimetype primero
+            ZipEntry mt = new ZipEntry("mimetype");
+            byte[] mtB = "application/epub+zip".getBytes(StandardCharsets.US_ASCII);
+            mt.setMethod(ZipEntry.STORED);
+            mt.setSize(mtB.length);
+            mt.setCompressedSize(mtB.length);
+            java.util.zip.CRC32 crc = new java.util.zip.CRC32();
+            crc.update(mtB);
+            mt.setCrc(crc.getValue());
+            zos.putNextEntry(mt);
+            zos.write(mtB);
+            zos.closeEntry();
+            for (Map.Entry<String, String> en : files.entrySet()) {
+                zos.putNextEntry(new ZipEntry(en.getKey()));
+                zos.write(en.getValue().getBytes(StandardCharsets.UTF_8));
+                zos.closeEntry();
+            }
+        }
     }
 }
