@@ -328,91 +328,17 @@ public class MenuExtractor {
             if (!vip.isEmpty()) {
                 sb.append("Capitulos VIP (bloqueados, requieren desbloqueo en tu cuenta) (")
                         .append(vip.size()).append("):\n")
-                        .append(formatearListaCaps(vip)).append("\n\n");
+                        .append(CapitulosUtil.formatearListaCaps(vip)).append("\n\n");
             }
             if (!faltantes.isEmpty()) {
                 sb.append("Capitulos NO descargados por error (NO VIP) (")
                         .append(faltantes.size()).append("):\n")
-                        .append(formatearListaCaps(faltantes)).append("\n");
+                        .append(CapitulosUtil.formatearListaCaps(faltantes)).append("\n");
             }
             java.nio.file.Files.writeString(pathBase.resolve("FALTANTES.txt"), sb.toString());
         } catch (Exception e) {
             System.err.println("No se pudo escribir FALTANTES.txt: " + e.getMessage());
         }
-    }
-
-    /** Une los números de capítulo exactos (decimales incluidos) separados por coma. */
-    static String formatearListaCaps(java.util.Collection<Double> caps) {
-        StringBuilder sb = new StringBuilder();
-        for (Double cap : caps) {
-            if (sb.length() > 0) {
-                sb.append(", ");
-            }
-            sb.append(formatearNumeroCap(cap));
-        }
-        return sb.toString();
-    }
-
-    /** Muestra 15 (entero) o 15.1 (decimal); NUNCA inventa un entero a partir de un decimal. */
-    static String formatearNumeroCap(double cap) {
-        if (cap == Math.floor(cap) && !Double.isInfinite(cap)) {
-            return String.valueOf((long) cap);
-        }
-        return String.valueOf(cap);
-    }
-
-    static Map<Double, String> filtrarCapitulos(Map<Double, String> todosLosCapitulos, int opcion,
-            int limite, int inicio, int fin, String listaStr) {
-        Map<Double, String> filtrados = new HashMap<>();
-        if (todosLosCapitulos == null) {
-            return filtrados;
-        }
-        switch (opcion) {
-            case 1:
-            case 2:
-                int max = (opcion == 2 && limite > 0) ? limite : Integer.MAX_VALUE;
-                for (Double k : todosLosCapitulos.keySet())
-                    if (k <= max)
-                        filtrados.put(k, todosLosCapitulos.get(k));
-                break;
-            case 4:
-                for (Double k : todosLosCapitulos.keySet())
-                    if (k >= inicio && k <= fin)
-                        filtrados.put(k, todosLosCapitulos.get(k));
-                break;
-            case 5:
-                String[] nums = (listaStr != null) ? listaStr.split(",") : new String[0];
-                for (String n : nums) {
-                    try {
-                        double nb = Double.parseDouble(n.trim());
-                        if (todosLosCapitulos.containsKey(nb))
-                            filtrados.put(nb, todosLosCapitulos.get(nb));
-                    } catch (Exception e) {
-                    }
-                }
-                break;
-            case 3:
-                double dLimite = (double) limite;
-                if (todosLosCapitulos.containsKey(dLimite))
-                    filtrados.put(dLimite, todosLosCapitulos.get(dLimite));
-                break;
-        }
-        return filtrados;
-    }
-
-    static double extraerNumeroDeTitulo(String titulo) {
-        if (titulo == null)
-            return 0.0;
-        Pattern pattern = Pattern.compile("\\d+(\\.\\d+)?");
-        Matcher matcher = pattern.matcher(titulo);
-        if (matcher.find()) {
-            try {
-                return Double.parseDouble(matcher.group());
-            } catch (NumberFormatException e) {
-                return 0.0;
-            }
-        }
-        return 0.0;
     }
 
     private static void ejecutarDescargaParalela(Map<Double, String> capitulosParaDescargar, String rutaDeGuardado,
@@ -552,11 +478,11 @@ public class MenuExtractor {
         System.out.println("  ------------------------------------------------");
         if (!r.vip.isEmpty()) {
             System.out.println("   VIP (bloqueados, requieren desbloqueo en tu cuenta):");
-            System.out.println("   " + formatearListaCaps(r.vip));
+            System.out.println("   " + CapitulosUtil.formatearListaCaps(r.vip));
         }
         if (!r.faltantes.isEmpty()) {
             System.out.println("   Fallidos (error, NO VIP):");
-            System.out.println("   " + formatearListaCaps(r.faltantes));
+            System.out.println("   " + CapitulosUtil.formatearListaCaps(r.faltantes));
         }
     }
 
@@ -648,7 +574,7 @@ public class MenuExtractor {
             Map<Double, String> todosLosCapitulos = obtenerTodosLosCapitulos(url);
 
             // FILTRADO DE CAPÍTULOS (Lógica de Menú) — lógica pura extraída y testeable.
-            Map<Double, String> filtrados = filtrarCapitulos(todosLosCapitulos, opcion, limite, inicio, fin, listaStr);
+            Map<Double, String> filtrados = CapitulosUtil.filtrarCapitulos(todosLosCapitulos, opcion, limite, inicio, fin, listaStr);
 
             if (filtrados.isEmpty()) {
                 progresoWeb.accept("ERROR: ❌ No se encontraron capítulos.");
@@ -696,7 +622,7 @@ public class MenuExtractor {
                         @Override
                         public void capituloIniciado(int hiloIdx, double numCap, int hechosEnHilo,
                                 int totalEnHilo, int hechosGlobal, int totalGlobal) {
-                            msgHilos[hiloIdx] = "Cap #" + formatearNumeroCap(numCap);
+                            msgHilos[hiloIdx] = "Cap #" + CapitulosUtil.formatearNumeroCap(numCap);
                             pctHilos[hiloIdx] = (totalEnHilo == 0) ? 0
                                     : (int) (((double) hechosEnHilo / totalEnHilo) * 100);
                             emitirJson.accept(hechosGlobal, totalGlobal);
@@ -726,7 +652,7 @@ public class MenuExtractor {
                     resumen.append(" VIP (bloqueados): ").append(res.vip.size()).append('.');
                 }
                 if (!res.faltantes.isEmpty()) {
-                    resumen.append(" Sin bajar: ").append(formatearListaCaps(res.faltantes)).append('.');
+                    resumen.append(" Sin bajar: ").append(CapitulosUtil.formatearListaCaps(res.faltantes)).append('.');
                 }
                 resumen.append(" Ver FALTANTES.txt.");
                 progresoWeb.accept(resumen.toString());
