@@ -8,7 +8,6 @@ import com.extractor.mi_extractor.processor.ZipArchiveProcessor;
 import com.extractor.mi_extractor.processor.SplitProcessor;
 
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -56,7 +55,7 @@ public class EpubService {
 
     public void iniciarProceso(String id, byte[] bytes, String nombre, String accion,
             Integer tipoDivision, Integer parametro, String sitio, String creador, List<String> nombresPaginas,
-            List<Integer> capitulosAnteriores, MultipartFile[] folderFiles) {
+            List<Integer> capitulosAnteriores) {
         jobService.crear(id, accion);
         new Thread(() -> {
             try {

@@ -36,7 +36,6 @@ public class EpubController {
     @PostMapping("/upload")
     public String upload(
             @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "files", required = false) MultipartFile[] folderFiles,
             @RequestParam("accion") String accion,
             @RequestParam(value = "tipoDivision", required = false) Integer tipoDivision,
             @RequestParam(value = "parametro", required = false) Integer parametro,
@@ -50,7 +49,7 @@ public class EpubController {
 
         // Le pasamos todo al servicio
         epubService.iniciarProceso(id, file.getBytes(), file.getOriginalFilename(), accion, tipoDivision,
-                parametro, sitio, creador, nombresPaginas, capitulosAnteriores, folderFiles);
+                parametro, sitio, creador, nombresPaginas, capitulosAnteriores);
 
         return id;
     }
