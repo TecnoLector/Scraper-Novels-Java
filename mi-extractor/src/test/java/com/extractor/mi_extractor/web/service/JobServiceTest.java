@@ -1,4 +1,4 @@
-package com.extractor.mi_extractor.service;
+package com.extractor.mi_extractor.web.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -8,7 +8,7 @@ import java.time.Duration;
 
 import org.junit.jupiter.api.Test;
 
-import com.extractor.mi_extractor.model.EstadoJob;
+import com.extractor.mi_extractor.web.model.EstadoJob;
 
 class JobServiceTest {
 

@@ -1,0 +1,106 @@
+package com.extractor.mi_extractor.web.controller;
+
+import com.extractor.mi_extractor.web.service.EpubService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/epub")
+public class EpubController {
+
+    private final EpubService epubService;
+    private final UrlSafetyValidator urlSafetyValidator;
+    private final com.extractor.mi_extractor.web.service.JobService jobService;
+
+    public EpubController(EpubService epubService, UrlSafetyValidator urlSafetyValidator,
+            com.extractor.mi_extractor.web.service.JobService jobService) {
+        this.epubService = epubService;
+        this.urlSafetyValidator = urlSafetyValidator;
+        this.jobService = jobService;
+    }
+
+    @PostMapping("/upload")
+    public String upload(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("accion") String accion,
+            @RequestParam(value = "tipoDivision", required = false) Integer tipoDivision,
+            @RequestParam(value = "parametro", required = false) Integer parametro,
+            @RequestParam(value = "sitio", required = false) String sitio,
+            @RequestParam(value = "creador", required = false) String creador,
+            @RequestParam(value = "nombresPaginas", required = false) List<String> nombresPaginas,
+            @RequestParam(value = "capitulosAnteriores", required = false) List<Integer> capitulosAnteriores)
+            throws Exception {
+
+        String id = UUID.randomUUID().toString();
+
+        // Le pasamos todo al servicio
+        epubService.iniciarProceso(id, file.getBytes(), file.getOriginalFilename(), accion, tipoDivision,
+                parametro, sitio, creador, nombresPaginas, capitulosAnteriores);
+
+        return id;
+    }
+
+    @GetMapping("/status/{id}")
+    public String checkStatus(@PathVariable String id) {
+        return jobService.getMensaje(id);
+    }
+
+    @GetMapping("/download/{id}")
+    public ResponseEntity<Resource> download(@PathVariable String id) throws Exception {
+        Path path = jobService.getResultado(id);
+
+        if (path == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Resource resource = new UrlResource(path.toUri());
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("application/zip"))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + path.getFileName().toString() + "\"")
+                .body(resource);
+    }
+
+    @PostMapping("/scrape")
+    public String iniciarExtraccion(
+            @RequestParam("url") String url,
+            @RequestParam("opcion") Integer opcion, // Viene del select 'tipoExtraccion'
+            @RequestParam(value = "hilos", defaultValue = "3") Integer hilos,
+            @RequestParam(value = "limite", defaultValue = "0") Integer limite,
+            @RequestParam(value = "inicio", defaultValue = "0") Integer inicio,
+            @RequestParam(value = "fin", defaultValue = "0") Integer fin,
+            @RequestParam(value = "lista", defaultValue = "") String lista) {
+
+        // Seguridad (anti-SSRF): valida la URL en el borde antes de encolar nada.
+        urlSafetyValidator.validar(url);
+
+        String id = UUID.randomUUID().toString();
+
+        // Llamamos al servicio pasando TODO
+        epubService.iniciarExtraccionWeb(id, url, opcion, hilos, limite, inicio, fin, lista);
+
+        return id;
+    }
+
+    @ExceptionHandler(UrlNoPermitidaException.class)
+    public ResponseEntity<String> manejarUrlNoPermitida(UrlNoPermitidaException e) {
+        return ResponseEntity.badRequest()
+                .contentType(new MediaType(MediaType.TEXT_PLAIN, StandardCharsets.UTF_8))
+                .body(e.getMessage());
+    }
+}

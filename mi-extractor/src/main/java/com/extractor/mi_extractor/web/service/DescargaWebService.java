@@ -1,4 +1,4 @@
-package com.extractor.mi_extractor;
+package com.extractor.mi_extractor.web.service;
 import com.extractor.mi_extractor.scraping.model.Capitulo;
 import com.extractor.mi_extractor.scraping.util.ConfigScraper;
 import com.extractor.mi_extractor.scraping.service.*;

@@ -1,4 +1,4 @@
-package com.extractor.mi_extractor.model;
+package com.extractor.mi_extractor.web.model;
 
 import java.nio.file.Path;
 import java.time.Instant;

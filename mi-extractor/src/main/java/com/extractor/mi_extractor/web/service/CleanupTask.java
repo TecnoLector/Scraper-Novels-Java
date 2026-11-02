@@ -1,4 +1,4 @@
-package com.extractor.mi_extractor.service;
+package com.extractor.mi_extractor.web.service;
 import com.extractor.mi_extractor.common.StorageService;
 
 import java.time.Duration;

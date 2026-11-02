@@ -1,4 +1,4 @@
-package com.extractor.mi_extractor.service;
+package com.extractor.mi_extractor.web.service;
 
 import java.nio.file.Path;
 import java.time.Duration;
@@ -8,8 +8,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.stereotype.Service;
 
-import com.extractor.mi_extractor.model.EstadoJob;
-import com.extractor.mi_extractor.model.Job;
+import com.extractor.mi_extractor.web.model.EstadoJob;
+import com.extractor.mi_extractor.web.model.Job;
 
 /**
  * Gestiona los trabajos en memoria con expiración por TTL. Reemplaza a los antiguos

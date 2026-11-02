@@ -1,4 +1,4 @@
-package com.extractor.mi_extractor.service;
+package com.extractor.mi_extractor.web.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;

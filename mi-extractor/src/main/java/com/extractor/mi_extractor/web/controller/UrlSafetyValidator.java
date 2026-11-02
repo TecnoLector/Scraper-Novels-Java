@@ -1,4 +1,4 @@
-package com.extractor.mi_extractor.controller;
+package com.extractor.mi_extractor.web.controller;
 import com.extractor.mi_extractor.scraping.service.GestorSitios;
 
 
