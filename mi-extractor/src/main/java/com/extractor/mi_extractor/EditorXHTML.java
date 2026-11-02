@@ -305,8 +305,9 @@ public class EditorXHTML {
     private void mostrarSubMenuCrearEpub() {
         System.out.println("\n--- Crear Archivo EPUB ---");
         System.out.println("¿Cómo quieres crear el EPUB?");
-        System.out.println("1. Desde cero (usando los archivos .xhtml de la carpeta OEBPS/Text)");
+        System.out.println("1. Desde cero EPUB 2 (epub4j, usando los .xhtml de OEBPS/Text)");
         System.out.println("2. Re-empaquetar estructura existente (carpeta con mimetype, META-INF, OEBPS)");
+        System.out.println("3. Desde cero EPUB 3 (nativo: OPF 3.0 + nav.xhtml, usando los .xhtml de OEBPS/Text)");
         System.out.println("0. Cancelar");
         System.out.print("Elige una opción: ");
 
@@ -325,11 +326,76 @@ public class EditorXHTML {
             case 2:
                 crearEpubDesdeCarpeta();
                 break;
+            case 3:
+                crearEpub3DesdeCero();
+                break;
             case 0:
                 System.out.println("Creación cancelada.");
                 break;
             default:
                 System.out.println("Opción no válida.");
+        }
+    }
+
+    /**
+     * Crea un EPUB 3 NATIVO (sin epub4j) con el empaquetador propio. Pide los mismos metadatos
+     * que la opción 1 (mismos nombres de variables) y delega el ensamblado en EmpaquetadorEpub3.
+     */
+    private void crearEpub3DesdeCero() {
+        System.out.println("--- Crear EPUB 3 (nativo) ---");
+        System.out.println("Se escanearán automáticamente OEBPS/Styles, Fonts, Images y Text.");
+
+        System.out.println("Introduce el título del libro:");
+        String tituloLibro = scanner.nextLine();
+        System.out.println("Introduce el autor:");
+        String autorLibro = scanner.nextLine();
+        System.out.println("Introduce la sinopsis (deja en blanco si no hay):");
+        String sinopsis = scanner.nextLine();
+        System.out.println("Introduce los géneros (separados por coma):");
+        String generosStr = scanner.nextLine();
+        System.out.println("(Opcional) Introduce el sitio de extracción:");
+        String sitioExtraccion = scanner.nextLine();
+        System.out.println("(Opcional) Introduce tu nombre como creador del archivo:");
+        String creadorArchivo = scanner.nextLine();
+        System.out.println("Introduce el nombre del archivo de la portada (ej: portada.jpg), o vacío:");
+        System.out.println("(Debe estar en OEBPS/Images)");
+        String nombrePortada = scanner.nextLine();
+        System.out.println("Introduce el nombre del archivo de salida (ej: MiLibro.epub):");
+        String archivoSalida = scanner.nextLine();
+        if (archivoSalida == null || archivoSalida.isBlank()) {
+            System.out.println("Nombre de archivo no válido. Cancelando.");
+            return;
+        }
+        if (!archivoSalida.toLowerCase().endsWith(".epub")) {
+            archivoSalida = archivoSalida + ".epub";
+        }
+
+        try {
+            EmpaquetadorEpub3.Metadatos meta = new EmpaquetadorEpub3.Metadatos();
+            meta.titulo = tituloLibro;
+            meta.autor = autorLibro;
+            meta.sinopsis = sinopsis;
+            meta.generosCsv = generosStr;
+            meta.idioma = "es";
+            if (nombrePortada != null && !nombrePortada.isBlank()) {
+                meta.coverHref = "Images/" + nombrePortada.trim().replace(File.separator, "/");
+            }
+
+            // Página de información (reusa el mismo generador que la opción 1).
+            String paginaInfo = generarPaginaMetadatosXHTML(tituloLibro, autorLibro, sinopsis,
+                    generosStr, sitioExtraccion, creadorArchivo, this.archivosXHTML);
+
+            java.util.List<File> capitulos = java.util.Arrays.asList(this.archivosXHTML);
+            Path salida = Paths.get(this.rutaCarpeta, archivoSalida);
+
+            new EmpaquetadorEpub3().crear(Paths.get(this.rutaCarpeta), meta, capitulos, paginaInfo, salida);
+
+            System.out.println("\n-----------------------------------");
+            System.out.println("¡EPUB 3 creado con éxito!");
+            System.out.println("Ubicación: " + salida);
+            System.out.println("-----------------------------------");
+        } catch (Exception e) {
+            System.err.println("Error creando el EPUB 3: " + e.getMessage());
         }
     }
 
