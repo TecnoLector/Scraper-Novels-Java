@@ -1,4 +1,4 @@
-package com.extractor.mi_extractor;
+package com.extractor.mi_extractor.cli.descarga;
 import com.extractor.mi_extractor.scraping.util.ConfigScraper;
 import com.extractor.mi_extractor.scraping.model.SitioWebConfig;
 import com.extractor.mi_extractor.scraping.model.Capitulo;
@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit;
  * {@link DescargaWebService} sin cambios de comportamiento. La parte web vive en DescargaWebService;
  * ambos comparten CatalogoCapitulos, CapitulosUtil, ReporteFaltantes y MotorDescargaParalela.
  */
-class DescargaCli {
+public class DescargaCli {
 private static final Logger log = LoggerFactory.getLogger(DescargaCli.class);
 
     public static void iniciar(Scanner scanner) {

@@ -1,4 +1,4 @@
-package com.extractor.mi_extractor;
+package com.extractor.mi_extractor.cli.utilidades;
 
 import java.io.File;
 import java.util.Scanner;

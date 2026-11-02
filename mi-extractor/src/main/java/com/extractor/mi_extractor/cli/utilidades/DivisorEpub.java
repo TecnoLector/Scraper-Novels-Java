@@ -1,4 +1,4 @@
-package com.extractor.mi_extractor;
+package com.extractor.mi_extractor.cli.utilidades;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

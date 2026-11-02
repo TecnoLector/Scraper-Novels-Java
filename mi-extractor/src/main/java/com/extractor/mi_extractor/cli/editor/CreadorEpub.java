@@ -1,4 +1,4 @@
-package com.extractor.mi_extractor;
+package com.extractor.mi_extractor.cli.editor;
 import com.extractor.mi_extractor.epub.service.EmpaquetadorEpub3;
 
 import org.slf4j.Logger;
