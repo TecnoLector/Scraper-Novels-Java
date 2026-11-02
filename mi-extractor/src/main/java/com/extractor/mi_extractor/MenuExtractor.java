@@ -311,36 +311,6 @@ public class MenuExtractor {
         }
     }
 
-    /**
-     * Filtra los capítulos según la opción del menú. Lógica pura (sin Selenium ni I/O),
-     * extraída de {@code descargarWebMultiHilo} para poder testearla.
-     *
-     * <ul>
-     *   <li>1: todos; 2: hasta {@code limite} (si {@code >0}); 3: solo el capítulo {@code limite};
-     *   4: rango {@code [inicio, fin]}; 5: lista CSV en {@code listaStr}.</li>
-     * </ul>
-     */
-    /** Escribe FALTANTES.txt con dos secciones: VIP (bloqueados) y fallos reales (no VIP). */
-    private static void escribirReporteFaltantes(java.nio.file.Path pathBase, java.util.Set<Double> faltantes,
-            java.util.Set<Double> vip) {
-        try {
-            StringBuilder sb = new StringBuilder();
-            if (!vip.isEmpty()) {
-                sb.append("Capitulos VIP (bloqueados, requieren desbloqueo en tu cuenta) (")
-                        .append(vip.size()).append("):\n")
-                        .append(CapitulosUtil.formatearListaCaps(vip)).append("\n\n");
-            }
-            if (!faltantes.isEmpty()) {
-                sb.append("Capitulos NO descargados por error (NO VIP) (")
-                        .append(faltantes.size()).append("):\n")
-                        .append(CapitulosUtil.formatearListaCaps(faltantes)).append("\n");
-            }
-            java.nio.file.Files.writeString(pathBase.resolve("FALTANTES.txt"), sb.toString());
-        } catch (Exception e) {
-            System.err.println("No se pudo escribir FALTANTES.txt: " + e.getMessage());
-        }
-    }
-
     private static void ejecutarDescargaParalela(Map<Double, String> capitulosParaDescargar, String rutaDeGuardado,
             Scanner scanner) {
         if (capitulosParaDescargar.isEmpty()) {
@@ -426,7 +396,7 @@ public class MenuExtractor {
         // Deja constancia en disco de VIP y fallidos (junto a los capítulos, en la carpeta de la novela).
         boolean hayPendientes = !resultado.vip.isEmpty() || !resultado.faltantes.isEmpty();
         if (hayPendientes) {
-            escribirReporteFaltantes(Paths.get(rutaDeGuardado), resultado.faltantes, resultado.vip);
+            ReporteFaltantes.escribir(Paths.get(rutaDeGuardado), resultado.faltantes, resultado.vip);
         }
 
         imprimirResumenDescarga(resultado, numeroHilos);
@@ -646,7 +616,7 @@ public class MenuExtractor {
 
             // Reporte: VIP (bloqueados) y fallos reales, con números exactos.
             if (!res.faltantes.isEmpty() || !res.vip.isEmpty()) {
-                escribirReporteFaltantes(pathBase, res.faltantes, res.vip);
+                ReporteFaltantes.escribir(pathBase, res.faltantes, res.vip);
                 StringBuilder resumen = new StringBuilder("95% - Completado.");
                 if (!res.vip.isEmpty()) {
                     resumen.append(" VIP (bloqueados): ").append(res.vip.size()).append('.');
