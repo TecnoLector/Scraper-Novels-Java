@@ -1,4 +1,5 @@
-package com.extractor.mi_extractor;
+package com.extractor.mi_extractor.scraping.model;
+import com.extractor.mi_extractor.scraping.service.IndiceExtractor;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

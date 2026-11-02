@@ -1,4 +1,6 @@
-package com.extractor.mi_extractor;
+package com.extractor.mi_extractor.scraping.service;
+import com.extractor.mi_extractor.scraping.model.Capitulo;
+import com.extractor.mi_extractor.scraping.service.*;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;

@@ -1,4 +1,6 @@
 package com.extractor.mi_extractor;
+import com.extractor.mi_extractor.scraping.model.*;
+import com.extractor.mi_extractor.scraping.service.GestorSitios;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;

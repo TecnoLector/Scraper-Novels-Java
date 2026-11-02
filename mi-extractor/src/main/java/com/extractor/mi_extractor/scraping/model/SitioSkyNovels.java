@@ -1,4 +1,4 @@
-package com.extractor.mi_extractor;
+package com.extractor.mi_extractor.scraping.model;
 
 import java.time.Duration;
 import java.util.Collection;

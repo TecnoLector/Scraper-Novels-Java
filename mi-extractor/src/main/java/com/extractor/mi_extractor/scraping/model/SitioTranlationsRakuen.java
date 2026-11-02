@@ -1,4 +1,4 @@
-package com.extractor.mi_extractor;
+package com.extractor.mi_extractor.scraping.model;
 
 public class SitioTranlationsRakuen extends SitioWebConfig {
 

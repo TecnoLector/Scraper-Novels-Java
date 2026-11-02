@@ -1,4 +1,5 @@
-package com.extractor.mi_extractor; // O el paquete donde esté
+package com.extractor.mi_extractor.scraping.service; // O el paquete donde esté
+import com.extractor.mi_extractor.scraping.model.Capitulo;
 
 import java.io.IOException;
 import java.nio.file.Files;

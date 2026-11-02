@@ -1,4 +1,4 @@
-package com.extractor.mi_extractor;
+package com.extractor.mi_extractor.scraping.util;
 
 import java.io.InputStream;
 import java.util.Properties;

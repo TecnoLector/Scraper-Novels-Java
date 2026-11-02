@@ -1,4 +1,6 @@
-package com.extractor.mi_extractor;
+package com.extractor.mi_extractor.scraping.service;
+import com.extractor.mi_extractor.scraping.util.ConfigScraper;
+import com.extractor.mi_extractor.scraping.model.SitioWebConfig;
 
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;

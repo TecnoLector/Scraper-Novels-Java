@@ -1,4 +1,7 @@
 package com.extractor.mi_extractor;
+import com.extractor.mi_extractor.scraping.model.Capitulo;
+import com.extractor.mi_extractor.scraping.util.ConfigScraper;
+import com.extractor.mi_extractor.scraping.service.*;
 import com.extractor.mi_extractor.epub.service.EstructuraEpubInicializador;
 import com.extractor.mi_extractor.common.ReporteFaltantes;
 import com.extractor.mi_extractor.common.CapitulosUtil;

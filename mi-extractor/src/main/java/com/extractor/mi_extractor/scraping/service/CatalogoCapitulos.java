@@ -1,4 +1,4 @@
-package com.extractor.mi_extractor;
+package com.extractor.mi_extractor.scraping.service;
 
 import java.util.Map;
 import java.util.TreeMap;
@@ -12,14 +12,14 @@ import org.slf4j.LoggerFactory;
  * de comportamiento; lo usan CLI y web. El progreso va al log (no a stdout) para no ensuciar
  * la consola del servidor en las descargas web.
  */
-class CatalogoCapitulos {
+public class CatalogoCapitulos {
 
     private static final Logger log = LoggerFactory.getLogger(CatalogoCapitulos.class);
 
     private CatalogoCapitulos() {
     }
 
-    static Map<Double, String> obtener(String urlPortada) {
+    public static Map<Double, String> obtener(String urlPortada) {
         log.info("Obteniendo lista de capítulos...");
         Map<Double, String> mapaTotal = new TreeMap<>();
 

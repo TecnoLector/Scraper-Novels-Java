@@ -1,4 +1,5 @@
-package com.extractor.mi_extractor;
+package com.extractor.mi_extractor.scraping.service;
+import com.extractor.mi_extractor.scraping.model.Capitulo;
 
 import java.util.ArrayList;
 import java.util.List;

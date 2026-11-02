@@ -1,6 +1,6 @@
 package com.extractor.mi_extractor.controller;
+import com.extractor.mi_extractor.scraping.service.GestorSitios;
 
-import com.extractor.mi_extractor.GestorSitios;
 
 import org.springframework.stereotype.Component;
 

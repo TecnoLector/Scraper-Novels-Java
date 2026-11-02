@@ -1,4 +1,7 @@
 package com.extractor.mi_extractor;
+import com.extractor.mi_extractor.scraping.model.SitioNovelasLigera;
+import com.extractor.mi_extractor.scraping.model.Capitulo;
+import com.extractor.mi_extractor.scraping.service.ExtractorContenido;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
