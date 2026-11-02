@@ -1,4 +1,4 @@
-package com.extractor.mi_extractor.processor;
+package com.extractor.mi_extractor.epub.service;
 
 import java.io.BufferedReader;
 import java.io.File;

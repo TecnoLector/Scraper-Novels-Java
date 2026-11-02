@@ -1,4 +1,4 @@
-package com.extractor.mi_extractor;
+package com.extractor.mi_extractor.epub.service;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -24,11 +24,11 @@ import org.slf4j.LoggerFactory;
  * JAR (hoja de estilos y fuentes). Extraído de {@link DescargaWebService} sin cambios de
  * comportamiento; lo usan tanto el flujo CLI como el web.
  */
-class EstructuraEpubInicializador {
+public class EstructuraEpubInicializador {
 
     private static final Logger log = LoggerFactory.getLogger(EstructuraEpubInicializador.class);
 
-    static void inicializar(Path rutaBase) throws IOException {
+    public static void inicializar(Path rutaBase) throws IOException {
         Path rutaMimetype = rutaBase.resolve("mimetype");
 
         if (Files.notExists(rutaMimetype)) {

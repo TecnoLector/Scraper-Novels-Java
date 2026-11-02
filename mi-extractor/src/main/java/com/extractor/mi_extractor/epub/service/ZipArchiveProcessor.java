@@ -1,4 +1,4 @@
-package com.extractor.mi_extractor.processor;
+package com.extractor.mi_extractor.epub.service;
 import com.extractor.mi_extractor.common.StorageService;
 
 import org.springframework.stereotype.Component;

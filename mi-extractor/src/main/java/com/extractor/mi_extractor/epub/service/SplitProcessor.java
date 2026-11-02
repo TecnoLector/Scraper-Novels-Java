@@ -1,4 +1,5 @@
-package com.extractor.mi_extractor.processor;
+package com.extractor.mi_extractor.epub.service;
+import com.extractor.mi_extractor.epub.util.HtmlGeneratorUtil;
 import com.extractor.mi_extractor.common.StorageService;
 
 import io.documentnode.epub4j.domain.*;

@@ -2,10 +2,10 @@ package com.extractor.mi_extractor.service;
 import com.extractor.mi_extractor.common.StorageService;
 
 import com.extractor.mi_extractor.DescargaWebService;
-import com.extractor.mi_extractor.processor.CalibreProcessor;
-import com.extractor.mi_extractor.processor.InsertPageBookProcessor;
-import com.extractor.mi_extractor.processor.ZipArchiveProcessor;
-import com.extractor.mi_extractor.processor.SplitProcessor;
+import com.extractor.mi_extractor.epub.service.CalibreProcessor;
+import com.extractor.mi_extractor.epub.service.InsertPageBookProcessor;
+import com.extractor.mi_extractor.epub.service.ZipArchiveProcessor;
+import com.extractor.mi_extractor.epub.service.SplitProcessor;
 
 import org.springframework.stereotype.Service;
 
