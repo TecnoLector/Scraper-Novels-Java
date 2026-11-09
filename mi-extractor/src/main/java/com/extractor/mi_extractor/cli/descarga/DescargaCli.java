@@ -317,8 +317,7 @@ private static final Logger log = LoggerFactory.getLogger(DescargaCli.class);
             return;
         }
 
-        // Reanudar: saltar los capítulos cuyo .xhtml ya está en disco (tras un corte/bloqueo, solo
-        // se bajan los que faltan; también reduce peticiones en reintentos).
+        // Reanudar: si ya hay capítulos en disco, preguntar si saltarlos (reanudar) o re-bajar todo.
         Map<Double, String> pendientes = new TreeMap<>();
         int yaDescargados = 0;
         for (Map.Entry<Double, String> e : capitulosParaDescargar.entrySet()) {
@@ -329,13 +328,22 @@ private static final Logger log = LoggerFactory.getLogger(DescargaCli.class);
             }
         }
         if (yaDescargados > 0) {
-            System.out.println("Reanudando: " + yaDescargados + " capítulos ya estaban descargados; se omiten.");
+            System.out.println("\nHay " + yaDescargados + " capítulos ya descargados en esta carpeta.");
+            System.out.print("¿Reanudar (saltar los ya bajados) o re-descargar TODO? "
+                    + "(R = reanudar [Enter], T = todo): ");
+            String resp = scanner.nextLine().trim().toUpperCase();
+            if (resp.equals("T")) {
+                System.out.println("Se re-descargarán todos los capítulos (se sobrescriben los existentes).");
+                // Dejamos capitulosParaDescargar tal cual (todos).
+            } else {
+                if (pendientes.isEmpty()) {
+                    System.out.println("Reanudar: ya están todos descargados. Nada que hacer.");
+                    return;
+                }
+                System.out.println("Reanudar: se omiten los " + yaDescargados + " ya descargados.");
+                capitulosParaDescargar = pendientes;
+            }
         }
-        if (pendientes.isEmpty()) {
-            System.out.println("Todos los capítulos ya estaban descargados. Nada que hacer.");
-            return;
-        }
-        capitulosParaDescargar = pendientes;
 
         int totalCapitulos = capitulosParaDescargar.size();
 
