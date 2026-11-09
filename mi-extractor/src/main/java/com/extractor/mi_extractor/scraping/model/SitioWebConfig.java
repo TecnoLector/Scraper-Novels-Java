@@ -29,6 +29,23 @@ public abstract class SitioWebConfig {
     }
 
     /**
+     * Máximo de navegadores en paralelo recomendado para este sitio (anti rate-limit). Por defecto
+     * sin tope; los sitios con límites estrictos de peticiones (p. ej. Wordfence) lo bajan para no
+     * dispararlos. CLI y motor lo respetan.
+     */
+    public int getMaxNavegadoresRecomendado() {
+        return Integer.MAX_VALUE;
+    }
+
+    /**
+     * Pausa (ms) entre capítulos dentro de cada hilo, para bajar el ritmo de peticiones. Por
+     * defecto 0 (sin pausa); los sitios sensibles al rate-limit la suben.
+     */
+    public long getPausaEntreCapitulosMs() {
+        return 0;
+    }
+
+    /**
      * Preámbulo compartido del índice: hace clic en la pestaña "Contenido" si existe y espera a
      * que aparezca el contenedor del índice. La espera del contenedor puede lanzar (timeout); el
      * llamador lo captura, igual que antes.

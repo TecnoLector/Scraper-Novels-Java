@@ -1,5 +1,6 @@
 package com.extractor.mi_extractor.scraping.service;
 import com.extractor.mi_extractor.scraping.model.Capitulo;
+import com.extractor.mi_extractor.scraping.model.SitioWebConfig;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -100,6 +101,16 @@ public class MotorDescargaParalela {
         }
         int hilos = Math.max(1, numHilos);
 
+        // Config del sitio (anti rate-limit): tope de navegadores y pausa entre capítulos. Se toma
+        // de la primera URL; para un lote siempre es el mismo sitio.
+        SitioWebConfig cfg = GestorSitios.obtenerConfig(lista.get(0).getValue());
+        int maxRec = cfg.getMaxNavegadoresRecomendado();
+        if (hilos > maxRec) {
+            log.debug("Limitando a {} navegadores (recomendado para {}).", maxRec, cfg.getNombreSitio());
+            hilos = maxRec;
+        }
+        long pausaMs = cfg.getPausaEntreCapitulosMs();
+
         ExecutorService executor = Executors.newFixedThreadPool(hilos);
         int tamanoLote = (int) Math.ceil((double) total / hilos);
 
@@ -114,7 +125,7 @@ public class MotorDescargaParalela {
                 List<Map.Entry<Double, String>> subLista = lista.subList(inicio, fin);
 
                 executor.submit(() -> descargarLote(idH, subLista, rutaBase,
-                        exitos, globales, total, vip, faltantes, cb));
+                        exitos, globales, total, vip, faltantes, cb, pausaMs));
             }
 
             executor.shutdown();
@@ -138,7 +149,7 @@ public class MotorDescargaParalela {
     /** Bucle de un hilo sobre su sub-lista: reintentos, VIP y reciclado del navegador. */
     private void descargarLote(int idH, List<Map.Entry<Double, String>> subLista, String rutaBase,
             AtomicInteger exitos, AtomicInteger globales, int total,
-            Set<Double> vip, Set<Double> faltantes, ProgresoDescarga cb) {
+            Set<Double> vip, Set<Double> faltantes, ProgresoDescarga cb, long pausaMs) {
 
         Scraper scraper = fabricaScraper.get();
         ExtractorContenido extractor = fabricaExtractor.get();
@@ -194,6 +205,16 @@ public class MotorDescargaParalela {
                 hechosEnHilo++;
                 globales.incrementAndGet();
                 cb.capituloTerminado(idH, numCap, hechosEnHilo, totalEnHilo, globales.get(), total);
+
+                // Respiro anti rate-limit (0 en la mayoría de sitios): baja las peticiones/min.
+                if (pausaMs > 0) {
+                    try {
+                        Thread.sleep(pausaMs);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
 
                 if (hechosEnHilo % REFRESCO_CADA == 0) {
                     log.debug("[Hilo {}] Refrescando navegador para liberar RAM...", idH);

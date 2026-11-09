@@ -338,6 +338,18 @@ private static final Logger log = LoggerFactory.getLogger(DescargaCli.class);
         if (numeroHilos < 1) {
             numeroHilos = 1;
         }
+
+        // Tope por sitio (anti rate-limit): algunos sitios bloquean por peticiones/min (p. ej.
+        // Wordfence en novelaenespanol.com). Respetamos su recomendación para no provocar bloqueos.
+        SitioWebConfig cfgSitio = GestorSitios.obtenerConfig(capitulosParaDescargar.values().iterator().next());
+        int maxRecomendado = cfgSitio.getMaxNavegadoresRecomendado();
+        if (numeroHilos > maxRecomendado) {
+            System.out.println("Nota: " + cfgSitio.getNombreSitio() + " limita el ritmo de peticiones; "
+                    + "se usaran " + maxRecomendado + " navegadores (en vez de " + numeroHilos
+                    + ") para evitar bloqueos.");
+            numeroHilos = maxRecomendado;
+        }
+
         System.out.println("Usando " + numeroHilos + " navegadores (tope global: " + maxNav + ").");
 
         double constanteVelocidad = calcularConstanteRealista(numeroHilos);

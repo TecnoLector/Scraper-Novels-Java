@@ -109,6 +109,20 @@ public class SitioNovelaEnEspanol extends SitioWebConfig {
         return "a";
     }
 
+    // --- Anti rate-limit de Wordfence (ver nota de clase) ---
+
+    @Override
+    public int getMaxNavegadoresRecomendado() {
+        // Wordfence bloquea por peticiones/min; 3 navegadores (~80/min) dejan margen cómodo.
+        return 3;
+    }
+
+    @Override
+    public long getPausaEntreCapitulosMs() {
+        // Respiro extra entre capítulos para no acercarse al límite en novelas muy largas.
+        return 500;
+    }
+
     /**
      * Índice vía AJAX (ver nota de clase): espera a que la portada cargue, pide el JSON con el XHR
      * del navegador reintentando si viene vacío, y reconstruye un HTML limpio. Si llega la página de
