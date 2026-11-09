@@ -79,14 +79,24 @@ public abstract class SitioWebConfig {
             return driver.getPageSource();
 
         } catch (Exception e) {
-            log.warn("Advertencia obteniendo índice: {}", e.getMessage());
+            // Los errores de Selenium traen un mensaje enorme (Build info/Capabilities/Session…);
+            // en consola dejamos solo la causa y mandamos el detalle completo al log de fichero.
+            log.warn("Advertencia obteniendo índice: {}", primeraLinea(e));
+            log.debug("Detalle del fallo obteniendo índice", e);
             // Último recurso: intentar el HTML, pero sin que un navegador muerto vuelva a petar.
             try {
                 return driver.getPageSource();
             } catch (Exception e2) {
-                log.warn("No se pudo obtener el HTML tras el fallo: {}", e2.getMessage());
+                log.warn("No se pudo obtener el HTML tras el fallo: {}", primeraLinea(e2));
                 return "<!DOCTYPE html><html><body></body></html>";
             }
         }
+    }
+
+    /** Primera línea del mensaje de una excepción (evita volcar el diagnóstico largo de Selenium). */
+    private static String primeraLinea(Throwable t) {
+        String msg = (t.getMessage() != null) ? t.getMessage() : t.getClass().getSimpleName();
+        int nl = msg.indexOf('\n');
+        return (nl >= 0) ? msg.substring(0, nl).trim() : msg.trim();
     }
 }

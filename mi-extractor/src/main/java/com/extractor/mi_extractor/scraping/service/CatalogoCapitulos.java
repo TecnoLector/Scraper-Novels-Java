@@ -2,15 +2,18 @@ package com.extractor.mi_extractor.scraping.service;
 
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Recorre el índice de una novela (paginado incluido) con el {@link Scraper} y devuelve el
- * mapa completo de capítulos (número -> URL). Extraído de {@link DescargaWebService} sin cambios
- * de comportamiento; lo usan CLI y web. El progreso va al log (no a stdout) para no ensuciar
- * la consola del servidor en las descargas web.
+ * mapa completo de capítulos (número -> URL). Lo usan CLI y web.
+ *
+ * <p>El progreso se entrega por un callback: el CLI le pasa {@code System.out::println} para
+ * ver el avance limpio en consola; el web pasa un no-op (su progreso viaja por el JSON del
+ * trabajo). Además todo queda en el log a nivel debug (fichero), sin ensuciar la consola.
  */
 public class CatalogoCapitulos {
 
@@ -19,9 +22,22 @@ public class CatalogoCapitulos {
     private CatalogoCapitulos() {
     }
 
+    /** Variante sin progreso (lo usa el web, que informa por su propio canal). */
     public static Map<Double, String> obtener(String urlPortada) {
-        log.info("Obteniendo lista de capítulos...");
+        return obtener(urlPortada, m -> {
+        });
+    }
+
+    public static Map<Double, String> obtener(String urlPortada, Consumer<String> progreso) {
         Map<Double, String> mapaTotal = new TreeMap<>();
+
+        // Fallo rápido: si el sitio no está soportado, evitamos abrir Chrome y el timeout.
+        if (!GestorSitios.esUrlSoportada(urlPortada)) {
+            avisar(progreso, "Sitio no soportado (no está en la lista de webs conocidas): " + urlPortada);
+            return mapaTotal;
+        }
+
+        avisar(progreso, "Obteniendo lista de capítulos...");
 
         Scraper scraper = new Scraper();
         IndiceExtractor extractor = new IndiceExtractor();
@@ -31,7 +47,7 @@ public class CatalogoCapitulos {
 
         try {
             while (urlActual != null) {
-                log.info(">>> Analizando índice - Página {}...", pagina);
+                avisar(progreso, ">>> Analizando índice - Página " + pagina + "...");
                 scraper.navegarA(urlActual);
 
                 try {
@@ -46,23 +62,23 @@ public class CatalogoCapitulos {
                 Map<Double, String> capitulosPagina = extractor.extraerEnlaces(htmlIndice, urlActual);
 
                 if (capitulosPagina.isEmpty()) {
-                    log.warn("No se encontraron capítulos en la página {}.", pagina);
+                    avisar(progreso, "No se encontraron capítulos en la página " + pagina + ".");
                     if (pagina == 1)
                         break;
                 } else {
                     mapaTotal.putAll(capitulosPagina);
-                    log.info("    -> Encontrados {} caps. (Total acumulado: {})", capitulosPagina.size(),
-                            mapaTotal.size());
+                    avisar(progreso, "    -> Encontrados " + capitulosPagina.size() + " caps. (Total acumulado: "
+                            + mapaTotal.size() + ")");
                 }
 
                 String urlSiguiente = extractor.obtenerSiguientePagina(htmlIndice, urlActual);
 
                 if (urlSiguiente != null && !urlSiguiente.equals(urlActual)) {
-                    log.info(">>> Detectada siguiente página: {}", urlSiguiente);
+                    avisar(progreso, ">>> Detectada siguiente página: " + urlSiguiente);
                     urlActual = urlSiguiente;
                     pagina++;
                 } else {
-                    log.info(">>> Fin del índice (No se detectaron más páginas).");
+                    avisar(progreso, ">>> Fin del índice (No se detectaron más páginas).");
                     urlActual = null;
                 }
             }
@@ -70,5 +86,13 @@ public class CatalogoCapitulos {
             scraper.cerrar(); // SIEMPRE cerrar, aunque el navegador haya muerto a mitad del índice.
         }
         return mapaTotal;
+    }
+
+    /** Entrega el mensaje al callback (UI del llamador) y lo deja en el log a nivel debug. */
+    private static void avisar(Consumer<String> progreso, String mensaje) {
+        if (progreso != null) {
+            progreso.accept(mensaje);
+        }
+        log.debug("{}", mensaje);
     }
 }

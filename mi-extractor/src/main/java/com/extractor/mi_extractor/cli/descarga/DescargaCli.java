@@ -112,7 +112,7 @@ private static final Logger log = LoggerFactory.getLogger(DescargaCli.class);
         System.out.println("Introduce la URL de la PORTADA de la novela:");
         String urlPortada = scanner.nextLine();
 
-        Map<Double, String> todosLosCapitulos = CatalogoCapitulos.obtener(urlPortada);
+        Map<Double, String> todosLosCapitulos = CatalogoCapitulos.obtener(urlPortada, System.out::println);
 
         ejecutarDescargaParalela(todosLosCapitulos, rutaNovelaStr, scanner);
     }
@@ -154,7 +154,7 @@ private static final Logger log = LoggerFactory.getLogger(DescargaCli.class);
         System.out.println("Introduce la URL de la PORTADA de la novela:");
         String urlPortada = scanner.nextLine();
 
-        Map<Double, String> todosLosCapitulos = CatalogoCapitulos.obtener(urlPortada);
+        Map<Double, String> todosLosCapitulos = CatalogoCapitulos.obtener(urlPortada, System.out::println);
 
         if (todosLosCapitulos.isEmpty()) {
             System.out.println("No se encontraron capítulos. Revisa la URL.");
@@ -185,7 +185,7 @@ private static final Logger log = LoggerFactory.getLogger(DescargaCli.class);
 
         System.out.println("Introduce los números de capítulo separados por comas (ej: 10, 2.1, 2.2):");
         String listaDeNumerosStr = scanner.nextLine();
-        Map<Double, String> todosLosCapitulos = CatalogoCapitulos.obtener(urlPortada);
+        Map<Double, String> todosLosCapitulos = CatalogoCapitulos.obtener(urlPortada, System.out::println);
 
         if (todosLosCapitulos.isEmpty()) {
             System.out.println("Error: No se pudieron obtener capítulos de esa URL.");
