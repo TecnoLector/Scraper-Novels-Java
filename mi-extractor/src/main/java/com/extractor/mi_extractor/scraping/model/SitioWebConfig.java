@@ -38,11 +38,26 @@ public abstract class SitioWebConfig {
     }
 
     /**
-     * Pausa (ms) entre capítulos dentro de cada hilo, para bajar el ritmo de peticiones. Por
-     * defecto 0 (sin pausa); los sitios sensibles al rate-limit la suben.
+     * Pausa mínima (ms) entre capítulos dentro de cada hilo. El motor duerme un valor aleatorio
+     * entre {@link #getPausaMinMs()} y {@link #getPausaMaxMs()} (patrón más natural que un fijo).
+     * Por defecto 0 (sin pausa); los sitios sensibles al rate-limit la suben.
      */
-    public long getPausaEntreCapitulosMs() {
+    public long getPausaMinMs() {
         return 0;
+    }
+
+    /** Pausa máxima (ms) entre capítulos. Por defecto 0 (sin pausa). Ver {@link #getPausaMinMs()}. */
+    public long getPausaMaxMs() {
+        return 0;
+    }
+
+    /**
+     * {@code true} si el HTML recibido es una página de bloqueo del sitio (p. ej. el 503 de
+     * Wordfence por exceso de peticiones). Permite al motor abortar en vez de seguir martilleando.
+     * Por defecto {@code false}; los sitios con anti-bot conocido lo detectan.
+     */
+    public boolean esPaginaDeBloqueo(String html) {
+        return false;
     }
 
     /**

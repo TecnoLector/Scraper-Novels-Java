@@ -9,7 +9,9 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
@@ -55,12 +57,15 @@ public class MotorDescargaParalela {
         public final int total;
         public final Set<Double> vip;
         public final Set<Double> faltantes;
+        /** El lote se cortó porque el sitio bloqueó (p. ej. Wordfence): quedan capítulos sin intentar. */
+        public final boolean abortadoPorBloqueo;
 
-        ResultadoLote(int exitos, int total, Set<Double> vip, Set<Double> faltantes) {
+        ResultadoLote(int exitos, int total, Set<Double> vip, Set<Double> faltantes, boolean abortadoPorBloqueo) {
             this.exitos = exitos;
             this.total = total;
             this.vip = vip;
             this.faltantes = faltantes;
+            this.abortadoPorBloqueo = abortadoPorBloqueo;
         }
     }
 
@@ -95,9 +100,11 @@ public class MotorDescargaParalela {
         AtomicInteger globales = new AtomicInteger(0);
         Set<Double> vip = new ConcurrentSkipListSet<>();
         Set<Double> faltantes = new ConcurrentSkipListSet<>();
+        // Se activa si el sitio bloquea (Wordfence); todos los hilos lo ven y cortan.
+        AtomicBoolean bloqueado = new AtomicBoolean(false);
 
         if (total == 0) {
-            return new ResultadoLote(0, 0, vip, faltantes);
+            return new ResultadoLote(0, 0, vip, faltantes, false);
         }
         int hilos = Math.max(1, numHilos);
 
@@ -109,7 +116,6 @@ public class MotorDescargaParalela {
             log.debug("Limitando a {} navegadores (recomendado para {}).", maxRec, cfg.getNombreSitio());
             hilos = maxRec;
         }
-        long pausaMs = cfg.getPausaEntreCapitulosMs();
 
         ExecutorService executor = Executors.newFixedThreadPool(hilos);
         int tamanoLote = (int) Math.ceil((double) total / hilos);
@@ -125,7 +131,7 @@ public class MotorDescargaParalela {
                 List<Map.Entry<Double, String>> subLista = lista.subList(inicio, fin);
 
                 executor.submit(() -> descargarLote(idH, subLista, rutaBase,
-                        exitos, globales, total, vip, faltantes, cb, pausaMs));
+                        exitos, globales, total, vip, faltantes, cb, cfg, bloqueado));
             }
 
             executor.shutdown();
@@ -143,13 +149,14 @@ public class MotorDescargaParalela {
             }
         }
 
-        return new ResultadoLote(exitos.get(), total, vip, faltantes);
+        return new ResultadoLote(exitos.get(), total, vip, faltantes, bloqueado.get());
     }
 
-    /** Bucle de un hilo sobre su sub-lista: reintentos, VIP y reciclado del navegador. */
+    /** Bucle de un hilo sobre su sub-lista: reintentos, VIP, detección de bloqueo y reciclado. */
     private void descargarLote(int idH, List<Map.Entry<Double, String>> subLista, String rutaBase,
             AtomicInteger exitos, AtomicInteger globales, int total,
-            Set<Double> vip, Set<Double> faltantes, ProgresoDescarga cb, long pausaMs) {
+            Set<Double> vip, Set<Double> faltantes, ProgresoDescarga cb,
+            SitioWebConfig cfg, AtomicBoolean bloqueado) {
 
         Scraper scraper = fabricaScraper.get();
         ExtractorContenido extractor = fabricaExtractor.get();
@@ -159,6 +166,11 @@ public class MotorDescargaParalela {
 
         try {
             for (Map.Entry<Double, String> entrada : subLista) {
+                // Si otro hilo detectó un bloqueo del sitio, cortamos ya (no seguir martilleando).
+                if (bloqueado.get()) {
+                    break;
+                }
+
                 double numCap = entrada.getKey();
                 String urlCap = entrada.getValue();
 
@@ -196,6 +208,15 @@ public class MotorDescargaParalela {
                     log.debug("Cap #{} es VIP (bloqueado), se omite.", numCap);
                     vip.add(numCap);
                 } else if (!exito) {
+                    // ¿El fallo es porque el sitio bloqueó la IP (p. ej. Wordfence)? Si es así, no es
+                    // un capítulo "faltante": avisamos, marcamos el aborto y cortamos el lote.
+                    if (cfg.esPaginaDeBloqueo(scraper.htmlActual())) {
+                        if (bloqueado.compareAndSet(false, true)) {
+                            log.warn("Descarga detenida: el sitio bloqueó la IP ({}). Espera unos minutos y "
+                                    + "reinicia la descarga; lo ya bajado se conserva y se reanuda.", cfg.getNombreSitio());
+                        }
+                        break;
+                    }
                     // A DEBUG (archivo) para no romper la barra de progreso de la CLI; el resumen
                     // final y FALTANTES.txt enumeran los fallidos, y el .log guarda la URL.
                     log.debug("Cap #{} no se pudo bajar tras {} intentos: {}", numCap, MAX_INTENTOS, urlCap);
@@ -207,13 +228,8 @@ public class MotorDescargaParalela {
                 cb.capituloTerminado(idH, numCap, hechosEnHilo, totalEnHilo, globales.get(), total);
 
                 // Respiro anti rate-limit (0 en la mayoría de sitios): baja las peticiones/min.
-                if (pausaMs > 0) {
-                    try {
-                        Thread.sleep(pausaMs);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        break;
-                    }
+                if (!dormirEntreCapitulos(cfg)) {
+                    break; // interrumpido
                 }
 
                 if (hechosEnHilo % REFRESCO_CADA == 0) {
@@ -227,6 +243,26 @@ public class MotorDescargaParalela {
             log.error("[Hilo {}] Error inesperado en el lote: {}", idH, ex.getMessage(), ex);
         } finally {
             scraper.cerrar();
+        }
+    }
+
+    /**
+     * Duerme un tiempo aleatorio entre {@code [pausaMin, pausaMax]} del sitio (0 = sin pausa).
+     * Devuelve {@code false} si el hilo fue interrumpido mientras dormía.
+     */
+    private boolean dormirEntreCapitulos(SitioWebConfig cfg) {
+        long min = Math.max(0, cfg.getPausaMinMs());
+        long max = Math.max(min, cfg.getPausaMaxMs());
+        if (max <= 0) {
+            return true;
+        }
+        long pausa = (max == min) ? min : ThreadLocalRandom.current().nextLong(min, max + 1);
+        try {
+            Thread.sleep(pausa);
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
         }
     }
 }

@@ -118,9 +118,24 @@ public class SitioNovelaEnEspanol extends SitioWebConfig {
     }
 
     @Override
-    public long getPausaEntreCapitulosMs() {
-        // Respiro extra entre capítulos para no acercarse al límite en novelas muy largas.
-        return 500;
+    public long getPausaMinMs() {
+        return 600; // respiro corto y aleatorio (600-1500 ms) entre capítulos por hilo.
+    }
+
+    @Override
+    public long getPausaMaxMs() {
+        return 1500;
+    }
+
+    @Override
+    public boolean esPaginaDeBloqueo(String html) {
+        if (html == null) {
+            return false;
+        }
+        String h = html.toLowerCase();
+        return h.contains("wordfence")
+                || h.contains("your access to this site has been limited")
+                || h.contains("your access to this service has been limited");
     }
 
     /**
@@ -229,17 +244,10 @@ public class SitioNovelaEnEspanol extends SitioWebConfig {
         return sb.toString();
     }
 
-    /** Detecta la página de bloqueo de Wordfence (límite de peticiones por minuto superado). */
+    /** Detecta la página de bloqueo de Wordfence en el DOM actual del navegador. */
     private boolean pareceBloqueoWordfence(WebDriver driver) {
         try {
-            String fuente = driver.getPageSource();
-            if (fuente == null) {
-                return false;
-            }
-            String f = fuente.toLowerCase();
-            return f.contains("wordfence")
-                    || f.contains("your access to this site has been limited")
-                    || f.contains("your access to this service has been limited");
+            return esPaginaDeBloqueo(driver.getPageSource());
         } catch (Exception e) {
             return false;
         }

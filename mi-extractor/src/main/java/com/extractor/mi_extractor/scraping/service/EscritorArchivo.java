@@ -17,26 +17,37 @@ public class EscritorArchivo {
         String titulo = capitulo.getTitulo();
         String contenidoHtml = capitulo.getContenidoHtml();
 
-        String nombreArchivo;
-        if (numeroCapitulo % 1 == 0) {
-            nombreArchivo = String.format("Capitulo%04d.xhtml", (int) numeroCapitulo);
-        } else {
-            String[] partes = String.valueOf(numeroCapitulo).split("\\.");
-            int entero = Integer.parseInt(partes[0]);
-            String decimal = partes[1];
-            nombreArchivo = String.format("Capitulo%04d_%s.xhtml", entero, decimal);
-        }
-        
-        // --- CAMBIO: Guardar dentro de OEBPS/Text ---
-        Path rutaCompleta = Paths.get(rutaDeGuardadoBase, "OEBPS", "Text", nombreArchivo);
+        // Guardar dentro de OEBPS/Text (ruta centralizada en rutaDestino para que "reanudar" pueda
+        // comprobar la existencia con el mismo criterio).
+        Path rutaCompleta = rutaDestino(rutaDeGuardadoBase, numeroCapitulo);
         // Crear carpetas necesarias si no existen (aunque DescargaWebService ya debería haberlas creado)
-        Files.createDirectories(rutaCompleta.getParent()); 
-        // --- FIN CAMBIO ---
+        Files.createDirectories(rutaCompleta.getParent());
 
         // Usamos la plantilla XHTML correcta (EPUB 2)
         String plantillaXHTML = construirPlantillaXHTML(titulo, contenidoHtml);
         Files.writeString(rutaCompleta, plantillaXHTML);
         log.debug("Guardado: {}", rutaCompleta);
+    }
+
+    /** Nombre de archivo de un capítulo: {@code CapituloNNNN.xhtml} o {@code CapituloNNNN_D.xhtml} (partes). */
+    public static String nombreArchivo(double numeroCapitulo) {
+        if (numeroCapitulo % 1 == 0) {
+            return String.format("Capitulo%04d.xhtml", (int) numeroCapitulo);
+        }
+        String[] partes = String.valueOf(numeroCapitulo).split("\\.");
+        int entero = Integer.parseInt(partes[0]);
+        String decimal = partes[1];
+        return String.format("Capitulo%04d_%s.xhtml", entero, decimal);
+    }
+
+    /** Ruta final de un capítulo dentro de la carpeta de la novela ({@code OEBPS/Text/...}). */
+    public static Path rutaDestino(String rutaDeGuardadoBase, double numeroCapitulo) {
+        return Paths.get(rutaDeGuardadoBase, "OEBPS", "Text", nombreArchivo(numeroCapitulo));
+    }
+
+    /** {@code true} si el capítulo ya está descargado en disco (para reanudar sin re-bajarlo). */
+    public static boolean yaDescargado(String rutaDeGuardadoBase, double numeroCapitulo) {
+        return Files.exists(rutaDestino(rutaDeGuardadoBase, numeroCapitulo));
     }
 
     // --- PLANTILLA XHTML PARA EPUB 3 (HTML5) ---

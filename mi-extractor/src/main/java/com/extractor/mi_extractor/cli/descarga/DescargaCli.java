@@ -317,6 +317,26 @@ private static final Logger log = LoggerFactory.getLogger(DescargaCli.class);
             return;
         }
 
+        // Reanudar: saltar los capítulos cuyo .xhtml ya está en disco (tras un corte/bloqueo, solo
+        // se bajan los que faltan; también reduce peticiones en reintentos).
+        Map<Double, String> pendientes = new TreeMap<>();
+        int yaDescargados = 0;
+        for (Map.Entry<Double, String> e : capitulosParaDescargar.entrySet()) {
+            if (EscritorArchivo.yaDescargado(rutaDeGuardado, e.getKey())) {
+                yaDescargados++;
+            } else {
+                pendientes.put(e.getKey(), e.getValue());
+            }
+        }
+        if (yaDescargados > 0) {
+            System.out.println("Reanudando: " + yaDescargados + " capítulos ya estaban descargados; se omiten.");
+        }
+        if (pendientes.isEmpty()) {
+            System.out.println("Todos los capítulos ya estaban descargados. Nada que hacer.");
+            return;
+        }
+        capitulosParaDescargar = pendientes;
+
         int totalCapitulos = capitulosParaDescargar.size();
 
         // Tú eliges cuántos navegadores en paralelo; se recorta al tope global (RAM).
@@ -411,6 +431,13 @@ private static final Logger log = LoggerFactory.getLogger(DescargaCli.class);
         }
 
         imprimirResumenDescarga(resultado, numeroHilos);
+
+        if (resultado.abortadoPorBloqueo) {
+            System.out.println();
+            System.out.println("  AVISO: la descarga se detuvo porque el sitio bloqueó temporalmente tu IP");
+            System.out.println("  (demasiadas peticiones). Espera unos minutos y vuelve a ejecutar la MISMA");
+            System.out.println("  descarga: se reanudará desde donde quedó (lo ya bajado no se repite).");
+        }
 
         if (hayPendientes) {
             System.out.println("   Detalle en: " + Paths.get(rutaDeGuardado, "FALTANTES.txt").toAbsolutePath());

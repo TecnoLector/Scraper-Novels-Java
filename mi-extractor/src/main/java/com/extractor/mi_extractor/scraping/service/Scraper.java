@@ -137,6 +137,15 @@ public class Scraper {
         return this.configActual;
     }
 
+    /** HTML de la página actual (para inspeccionar, p. ej., si es una página de bloqueo). "" si falla. */
+    public String htmlActual() {
+        try {
+            return driver.getPageSource();
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
     public void navegarA(String url) {
         this.configActual = GestorSitios.obtenerConfig(url);
         if (this.configActual == null) {
