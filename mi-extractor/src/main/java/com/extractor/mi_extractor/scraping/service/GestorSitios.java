@@ -19,6 +19,7 @@ public class GestorSitios {
         SITIOS_REGISTRADOS.add(new SitioNOVA());
         SITIOS_REGISTRADOS.add(new SitioSkyNovels());
         SITIOS_REGISTRADOS.add(new SitioTranlationsRakuen());
+        SITIOS_REGISTRADOS.add(new SitioNovelaEnEspanol());
     }
 
     public static SitioWebConfig obtenerConfig(String url) {
